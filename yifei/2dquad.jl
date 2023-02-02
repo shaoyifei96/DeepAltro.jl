@@ -7,6 +7,7 @@ const RD = RobotDynamics
 
 using ForwardDiff  # needed for @autodiff
 using FiniteDiff   # needed for @autodiff
+using DelimitedFiles
 
 RD.@autodiff struct quad2d <: RD.ContinuousDynamics end
 RD.state_dim(::quad2d) = 6
@@ -87,6 +88,7 @@ ilqr = Altro.get_ilqr(solver)
 K = ilqr.K  # feedback gain matrices
 d = ilqr.d  # feedforward gains. Should be small.
 
+# exit(0)
 
 using MeshCat
 using RobotZoo: Quadrotor, PlanarQuadrotor
@@ -130,29 +132,23 @@ function visualize!(vis, model, tf::Real, X)
     setanimation!(vis, anim)
 end
 
-using GeometryBasics
-using Plots
-p = plot(X[:,1])
-display(p)
-# return
+# using GeometryBasics
+# using Plots
+# p = plot(X[:,1])
+# display(p)
+# # return
 
 
-vis = Visualizer()
-model = PlanarQuadrotor()
-set_mesh!(vis, model)
-render(vis)
+# vis = Visualizer()
+# model = PlanarQuadrotor()
+# set_mesh!(vis, model)
+# render(vis)
 
-# ArrowVisualizer arrow(vis)
-# settransform!(arrow, Point(0.0, 0.0, 0.0), Vec(0.5, 0.5, 0.0))
-# settransform!(vis, Translation(x0[1:3]))
-# println(xf.type())
+# setobject!(vis, Sphere(Point(0,obsx,obsy), obsr))
 
-# plot(X[2,:])
-setobject!(vis, Sphere(Point(0,obsx,obsy), obsr))
-
-# setobject!(vis, Sphere(Point(xf[1],0,xf[2]), 0.1))
-# settransform!(vis, Translation(xf[1:3]))
-visualize!(vis, model, tf, X)
+# # setobject!(vis, Sphere(Point(xf[1],0,xf[2]), 0.1))
+# # settransform!(vis, Translation(xf[1:3]))
+# visualize!(vis, model, tf, X)
 
 
 
