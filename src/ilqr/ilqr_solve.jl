@@ -43,6 +43,7 @@ function solve!(solver::iLQRSolver)
     lg = solver.logger
     for iter = 1:solver.opts.iterations
         # Calculate the cost
+        ttt = @elapsed begin
         J_prev = TO.cost(solver, solver.Z̄)
 
         # Calculate expansions
@@ -70,11 +71,11 @@ function solve!(solver::iLQRSolver)
 
         # Check convergence
         exit = evaluate_convergence(solver)
-
+        end
         # Print log
         if solver.opts.verbose >= 3 
             printlog(lg)
-            @log lg "info" ""  # clear the info field
+            @log lg "info" string(ttt*1000.0)*"ms" # clear the info field
         end
 
         # Exit
