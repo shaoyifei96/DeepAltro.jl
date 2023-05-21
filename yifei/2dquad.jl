@@ -8,6 +8,14 @@ const RD = RobotDynamics
 using ForwardDiff  # needed for @autodiff
 using FiniteDiff   # needed for @autodiff
 using DelimitedFiles
+using Random
+import YAML
+using Distributions
+config = YAML.load_file("/home/yifei/Documents/optimal_ctrl/ESE5460-Deep-iLQR/configs/Quad2D_datagen.yml")
+# println(config)
+# println(config["controller"]["horizon"])
+# TODO: make all parameters to be in terms of file
+
 
 RD.@autodiff struct quad2d <: RD.ContinuousDynamics end
 RD.state_dim(::quad2d) = 6
@@ -42,52 +50,60 @@ N = 101              # number of time steps (knot points). Should be odd.
 tf = 3.0             # total time (sec)
 dt = tf / (N-1)      # time step (sec)
 
-
-x0 = SA_F64[1,1,0,0,0,0]   # start at the origin
-xf = SA_F64[0,3,0,0,0,0]  # goal state
-
-Q  = Diagonal(SA[0.1,0.1,0.1,1.0,1.0,1.0])
-R  = Diagonal(SA[0.01, 0.01])
-Qf = 100Q
-obj = LQRObjective(Q,R,Qf,xf,N)
-
-cons = ConstraintList(n,m,N)
-
-# Goal constraint
-goal = GoalConstraint(xf)
-add_constraint!(cons, goal, N)
-
-
 umin = [0.2*m*g; 0.2*m*g]
 umax = [0.6*m*g; 0.6*m*g]
-bnd = BoundConstraint(n,m, u_min=umin, u_max=umax)
-add_constraint!(cons, bnd, 1:N-1)  # add to all but the last time step
-obsx = 0.7
-obsy = 2
-obsr = 0.15
-obs = CircleConstraint(n, SA_F64[obsx], SA_F64[obsy], SA[obsr],1,2)#dim1 x, dim2 z
-add_constraint!(cons, obs, 1:N-1)
 
-prob = Problem(model, obj, x0, tf, xf=xf, constraints=cons)
-initial_controls!(prob, [@SVector rand(m) for k = 1:N-1])
-rollout!(prob)  
+for data_idx = 1:config["datagen"]["num_samples"]
+    # init_state = np.array([np.om.uniform(-3,3), np.random.uniform(-1,2), np.random.uniform(-math.pi/2.,math.pi/2.), np.random.uniform(-2,2), np.random.uniform(-2,2), np.random.uniform(-math.pi/4.,math.pi/4.)])
+    x0 = SA_F64[rand(Uniform(-3,3)),rand(Uniform(-1,2)),rand(Uniform(-π/2, π/2)),rand(Uniform(-2,2)),rand(Uniform(-2,2)),rand(Uniform(-π/4, π/4))]   # start at the origin
+    println(x0)
+    xf = SA_F64[0,0,0,0,0,0]  # goal state
 
-opts = SolverOptions()
-opts.cost_tolerance = 1e-5
-opts.projected_newton = false
-opts.verbose = 3
-# Create a solver, adding in additional options
-solver = ALTROSolver(prob, opts, show_summary=true)
-# set_options!(solver, verbose = 5)
-solve!(solver)
-status(solver)
+    Q  = Diagonal(SA[1.0,1.0,1.0,1.0,1.0,1.0])
+    R  = Diagonal(SA[1e-3, 1e-3])
+    Qf = 100Q
+    obj = LQRObjective(Q,R,Qf,xf,N)
 
-X = states(solver)     # alternatively states(prob)
-U = controls(solver)   # alternatively controls(prob)
-ilqr = Altro.get_ilqr(solver)
-K = ilqr.K  # feedback gain matrices
-d = ilqr.d  # feedforward gains. Should be small.
+    cons = ConstraintList(n,m,N)
 
+    # Goal constraint (first no constraints)
+    # goal = GoalConstraint(xf)
+    # add_constraint!(cons, goal, N)
+
+
+
+    # bnd = BoundConstraint(n,m, u_min=umin, u_max=umax)
+    # add_constraint!(cons, bnd, 1:N-1)  # add to all but the last time step
+    # obsx = 0.7
+    # obsy = 2
+    # obsr = 0.15
+    # obs = CircleConstraint(n, SA_F64[obsx], SA_F64[obsy], SA[obsr],1,2)#dim1 x, dim2 z
+    # add_constraint!(cons, obs, 1:N-1)
+
+    prob = Problem(model, obj, x0, tf, xf=xf, constraints=cons)
+    initial_controls!(prob, [@SVector [0.5*m*g, 0.5*m*g] for k = 1:N-1])
+    rollout!(prob)  
+
+    opts = SolverOptions()
+    opts.cost_tolerance = 1e-5
+    opts.projected_newton = false
+    # opts.line_search_lower_bound = 1e-8
+    # opts.line_search_upper_bound = 0.1
+    opts.verbose = 0
+    println(opts.line_search_decrease_factor)
+    # Create a solver, adding in additional options
+    solver = ALTROSolver(prob, opts, show_summary=true; problem_idx = data_idx)
+    # set_options!(solver, verbose = 5)
+    solve!(solver)
+    status(solver)
+
+    X = states(solver)     # alternatively states(prob)
+    U = controls(solver)   # alternatively controls(prob)
+    ilqr = Altro.get_ilqr(solver)
+    K = ilqr.K  # feedback gain matrices
+    d = ilqr.d  # feedforward gains. Should be small.
+
+end
 # exit(0)
 
 using MeshCat
@@ -132,11 +148,11 @@ function visualize!(vis, model, tf::Real, X)
     setanimation!(vis, anim)
 end
 
-# using GeometryBasics
-# using Plots
-# p = plot(X[:,1])
-# display(p)
-# # return
+using GeometryBasics
+using Plots
+p = plot(X[:,1])
+display(p)
+# return
 
 
 # vis = Visualizer()

@@ -101,6 +101,9 @@ Base.@kwdef mutable struct SolverOptions{T} <: AbstractSolverOptions{T}
     iterations::Int = 1000   # max number of iterations
     show_summary::Bool = true 
     verbose::Int = 0 
+    
+    #Yifei Debug
+    # problem_idx::Int = 0
 end
 
 function Base.copy(opts::SolverOptions)

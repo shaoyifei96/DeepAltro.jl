@@ -64,7 +64,7 @@ function forwardpass!(solver::iLQRSolver, J_prev)
     lg = solver.logger
     verbose = solver.opts.verbose
 
-    α = 1.0
+    α = 0.1
     J = Inf
     z = Inf
     expected = Inf

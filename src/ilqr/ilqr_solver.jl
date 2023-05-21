@@ -57,6 +57,8 @@ struct iLQRSolver{L,O,Nx,Ne,Nu,T,V} <: UnconstrainedSolver{T}
     xdot::Vector{T}
 
     logger::SolverLogging.Logger
+
+    problem_idx::Int
 end
 
 function iLQRSolver(
@@ -65,6 +67,7 @@ function iLQRSolver(
         stats::SolverStats=SolverStats{T}(parent=solvername(iLQRSolver));
         use_static::Val{USE_STATIC}=usestaticdefault(get_model(prob)[1]),
         dynamics_diffmethod::RD.DiffMethod=RD.default_diffmethod(TO.get_model(prob,1)),
+        problem_idx = 0,
         kwarg_opts...
     ) where {T, USE_STATIC}
     set_options!(opts; dynamics_diffmethod=dynamics_diffmethod, kwarg_opts...)
@@ -148,7 +151,7 @@ function iLQRSolver(
     solver = iLQRSolver{L,O,Nx,Ne,Nu,T,V}(
         prob.model, prob.obj, x0, TO.get_final_time(prob), N, opts, stats, Z, Z̄, dx, du,
         gains, K, d, D, G, Efull, Eerr, Q, S, ΔV, Qtmp, Quu_reg, Qux_reg, reg, grad, xdot,
-        lg,
+        lg, problem_idx
     )
     reset!(solver)
 end

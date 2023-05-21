@@ -45,13 +45,9 @@ function solve!(solver::iLQRSolver)
         # Calculate the cost
         ttt = @elapsed begin
         J_prev = TO.cost(solver, solver.Z̄)
-        DelimitedFiles.writedlm(string(solver.stats.iterations)*"_time_vec.txt",solver.Z̄.times,',')
-        DelimitedFiles.writedlm(string(solver.stats.iterations)*"_knot_vec.txt",solver.Z̄.data,',')
-        #     (file, )
-        # end
-        # open(string(solver.stats.iterations)*"_knotpoints.txt","w") do file
-        #     write(file, solver.Z̄.data)
-        # end
+        
+        # DelimitedFiles.writedlm("./data/raw/run_"*string(solver.problem_idx)*"_iter_"*lpad(string(solver.stats.iterations), 3, "0")*"_time_vec.txt",solver.Z̄.times,',')
+        DelimitedFiles.writedlm("./data/raw_rich/run_"*string(solver.problem_idx)*"_iter_"*lpad(string(solver.stats.iterations), 3, "0")*"_knot_vec.txt",solver.Z̄.data,',')
 
         # Calculate expansions
         # TODO: do this in parallel

@@ -32,6 +32,7 @@ function ALSolver(
         opts::SolverOptions=SolverOptions(), 
         stats::SolverStats=SolverStats(parent=solvername(ALSolver));
         use_static=usestaticdefault(get_model(prob)[1]),
+        problem_idx = 0,
         kwarg_opts...
     ) where {T}
     set_options!(opts; kwarg_opts...)
@@ -44,7 +45,7 @@ function ALSolver(
 
     
     # Instantiate the iLQR solver
-    ilqr = iLQRSolver(prob_al, opts, stats, use_static=use_static)
+    ilqr = iLQRSolver(prob_al, opts, stats; use_static=use_static, problem_idx = problem_idx)
     initialize!(alobj.conset, prob.constraints, ilqr.Z, ilqr.opts, alobj.alcost, ilqr.Efull)
     # settraj!(alobj.conset, get_trajectory(ilqr))
 
