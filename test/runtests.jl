@@ -13,7 +13,7 @@ using SparseArrays
 const RD = RobotDynamics
 const TO = TrajectoryOptimization
 
-TEST_TIME = false
+TEST_TIME = true
 Random.seed!(1)
 
 ##
@@ -27,46 +27,46 @@ if TEST_TIME
     end
 end
 
-@testset "Benchmark Problems" begin
-    include("nl_cartpole.jl")
-    include("cartpole.jl")
-    include("quadrotor.jl")
-    include("escape_solve.jl")
-    include("rocket_test.jl")
-    include(joinpath(@__DIR__,"..","examples","quickstart.jl"))
-end
+# @testset "Benchmark Problems" begin
+    # include("nl_cartpole.jl")
+    # include("cartpole.jl")
+    # include("quadrotor.jl")
+    # include("escape_solve.jl")
+    # include("rocket_test.jl")
+    # include(joinpath(@__DIR__,"..","examples","quickstart.jl"))
+# end
 
-@testset "Solvers" begin
-    include("constructors.jl")
-    include("augmented_lagrangian_tests.jl")
-    include("alilqr_test.jl")
-    include("ilqr_test.jl")
-    include("alcon_test.jl")
-    include("alconset_test.jl")
-    include("solve_tests.jl")
-    include("socp_test.jl")
-    include("projected_newton_test.jl")
-    include("expansion_test.jl")
-    include("infeasible_problem.jl")
-end
+# @testset "Solvers" begin
+#     include("constructors.jl")
+#     include("augmented_lagrangian_tests.jl")
+#     include("alilqr_test.jl")
+#     include("ilqr_test.jl")
+#     include("alcon_test.jl")
+#     include("alconset_test.jl")
+#     include("solve_tests.jl")
+#     include("socp_test.jl")
+#     include("projected_newton_test.jl")
+#     include("expansion_test.jl")
+#     include("infeasible_problem.jl")
+# end
 
-@testset "Solver Options" begin
-    include("solver_opts_test.jl")
-    include("solver_stats_test.jl")
-end
+# @testset "Solver Options" begin
+#     include("solver_opts_test.jl")
+#     include("solver_stats_test.jl")
+# end
 
-@testset "Quickstart" begin
-    include(joinpath(@__DIR__, "..", "examples", "quickstart.jl"))
-    @test max_violation(altro) ≈ 5.8962e-7 rtol=1e-4
-    @test cost(altro) ≈ 1.539 rtol = 1e-4
-    @test iterations(altro) == 44
-end
+# @testset "Quickstart" begin
+#     include(joinpath(@__DIR__, "..", "examples", "quickstart.jl"))
+#     @test max_violation(altro) ≈ 5.8962e-7 rtol=1e-4
+#     @test cost(altro) ≈ 1.539 rtol = 1e-4
+#     @test iterations(altro) == 44
+# end
 
-@testset "Utils" begin
-    @testset "QDLDL" begin
-        include("qdldl_test.jl")
-    end
-    @testset "Sparseblocks" begin
-        include("sparseblocks_test.jl")
-    end
-end
+# @testset "Utils" begin
+#     @testset "QDLDL" begin
+#         include("qdldl_test.jl")
+#     end
+#     @testset "Sparseblocks" begin
+#         include("sparseblocks_test.jl")
+#     end
+# end

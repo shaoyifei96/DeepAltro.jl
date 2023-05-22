@@ -1,6 +1,5 @@
-function Quadrotor(scenario=:zigzag, Rot=UnitQuaternion{Float64};
+function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj, obstacles,
         costfun=:Quadratic, normcon=false)
-    if scenario == :zigzag
         model = RobotZoo.Quadrotor{Rot}()
         n,m = RD.dims(model)
 
@@ -11,13 +10,13 @@ function Quadrotor(scenario=:zigzag, Rot=UnitQuaternion{Float64};
 
         # discretization
         N = 101 # number of knot points
-        tf = 5.0
+        tf = 10.0
         dt = tf/(N-1) # total time
 
         # Initial condition
-        x0_pos = @SVector [0., -10., 1.]
+        x0_pos = traj[1] #this is planning in local coordinates
         x0 = RobotDynamics.build_state(model, x0_pos, UnitQuaternion(I), zeros(3), zeros(3))
-        println(typeof(I))
+
         # cost
         costfun == :QuatLQR ? sq = 0 : sq = 1
         rm_quat = @SVector [1,2,3,4,5,6,8,9,10,11,12,13]
@@ -27,7 +26,8 @@ function Quadrotor(scenario=:zigzag, Rot=UnitQuaternion{Float64};
         q_nom = UnitQuaternion(I)
         v_nom, ω_nom = zeros(3), zeros(3)
         x_nom = Dynamics.build_state(model, zeros(3), q_nom, v_nom, ω_nom)
-
+        #why is the state zero? should it follow referecne trajectory?
+        
         if costfun == :QuatLQR
             cost_nom = QuatLQRCost(Q*dt, R*dt, x_nom, w=0.0)
         elseif costfun == :ErrorQuad
@@ -37,16 +37,15 @@ function Quadrotor(scenario=:zigzag, Rot=UnitQuaternion{Float64};
         end
 
         # waypoints
-        wpts = [(@SVector [10,0,1.]),
-                (@SVector [-10,0,1.]),
-                (@SVector [0,10,1.])]
-        times = [33, 66, 101]
+        times = round.(Int, range(1, stop=101, length=length(traj)))
+        println("length of traj is $(length(traj))")
+        # times = [33, 66, 101]
         Qw_diag = Dynamics.fill_state(model, 1e3,1*sq,1,1)
         Qf_diag = Dynamics.fill_state(model, 10., 100*sq, 10, 10)
-        xf = Dynamics.build_state(model, wpts[end], UnitQuaternion(I), zeros(3), zeros(3))
+        xf = Dynamics.build_state(model, traj[end], UnitQuaternion(I), zeros(3), zeros(3))
 
-        costs = map(1:length(wpts)) do i
-            r = wpts[i]
+        costs = map(1:length(traj)) do i
+            r = traj[i]
             xg = Dynamics.build_state(model, r, q_nom, v_nom, ω_nom)
             if times[i] == N
                 Q = Diagonal(Qf_diag)
@@ -64,16 +63,25 @@ function Quadrotor(scenario=:zigzag, Rot=UnitQuaternion{Float64};
                 LQRCost(Q, R, xg)
             end
         end
-
+        # println(times)
         costs_all = map(1:N) do k
+            # println("k is $k")
             i = findfirst(x->(x ≥ k), times)
+            # println(i)
             if k ∈ times
                 costs[i]
+                # println("Using goodcost")
             else
                 cost_nom
+                
             end
         end
 
+        # println(typeof(costs_all))
+        # println(typeof(costs_all[1]))
+        # println(typeof(costs[1]))
+        # println(typeof(cost_nom))
+        
         obj = Objective(costs_all)
 
         # Initialization
@@ -99,5 +107,4 @@ function Quadrotor(scenario=:zigzag, Rot=UnitQuaternion{Float64};
         rollout!(prob)
 
         return prob, opts
-    end
 end
