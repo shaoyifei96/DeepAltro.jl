@@ -1,4 +1,4 @@
-function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj, obstacles,
+function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj, obstacles, time_total,
         costfun=:Quadratic, normcon=false)
         model = RobotZoo.Quadrotor{Rot}()
         n,m = RD.dims(model)
@@ -10,7 +10,7 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj, obstacles,
 
         # discretization
         N = 101 # number of knot points
-        tf = 10.0
+        tf = convert(Float64, time_total) # Assigned from SplineTrajectory segment 0 total_time
         dt = tf/(N-1) # total time
 
         # Initial condition
@@ -20,9 +20,10 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj, obstacles,
         # cost
         costfun == :QuatLQR ? sq = 0 : sq = 1
         rm_quat = @SVector [1,2,3,4,5,6,8,9,10,11,12,13]
-        Q_diag = Dynamics.fill_state(model, 1e-5, 1e-5*sq, 1e-3, 1e-3)
+        Q_diag = Dynamics.fill_state(model, 1e-5, 0.0, 0.0, 0.0)
+                                    #       x         q:1e-5*sq      v 1e-3    w
         Q = Diagonal(Q_diag)
-        R = Diagonal(@SVector fill(1e-4,m))
+        R = Diagonal(@SVector fill(1e-2,m))
         q_nom = UnitQuaternion(I)
         v_nom, ω_nom = zeros(3), zeros(3)
         x_nom = Dynamics.build_state(model, zeros(3), q_nom, v_nom, ω_nom)
@@ -36,11 +37,13 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj, obstacles,
             cost_nom = LQRCost(Q*dt, R*dt, x_nom)
         end
 
+        traj = traj[1:7:end] #about 50/7 = 7 points
         # waypoints
         times = round.(Int, range(1, stop=101, length=length(traj)))
         println("length of traj is $(length(traj))")
         # times = [33, 66, 101]
-        Qw_diag = Dynamics.fill_state(model, 1e3,1*sq,1,1)
+        Qw_diag = Dynamics.fill_state(model, 1e3, 0.0,0.0,0.0)
+                                        #    x   q:1*sq v:1 w:1
         Qf_diag = Dynamics.fill_state(model, 10., 100*sq, 10, 10)
         xf = Dynamics.build_state(model, traj[end], UnitQuaternion(I), zeros(3), zeros(3))
 

@@ -2,7 +2,7 @@
 # run(`source /home/yifei/ws/devel/setup.bash`)
 import Pkg; Pkg.activate(@__DIR__); Pkg.instantiate()
 using RobotOS
-@rosimport planning_ros_msgs.msg: PlanTwoPointActionGoal
+@rosimport planning_ros_msgs.msg: PlanTwoPointActionGoal, SplineTrajectory
 @rosimport visualization_msgs.msg: Marker
 @rosimport decomp_ros_msgs.msg: PolyhedronArray
 @rosimport geometry_msgs.msg: Point
@@ -35,10 +35,12 @@ const Dynamics = RobotDynamics
 
 using Altro: ALTROSolver
 using Rotations
+using Plots
 
 include("./yifei/quadrotor_kr.jl")
 
 const obstacles = Ref{PolyhedronArray}() # Store it into a `Ref` which it's mutable but has a constant type
+const traj_received = Ref{SplineTrajectory}()
 
 macro debugtask(ex)
     quote
@@ -60,14 +62,15 @@ function path_callback(msg::Marker, pub_obj::Publisher{Marker})
     #ToDo: compile to obj save startup time https://stackoverflow.com/questions/73599900/julia-seems-to-be-very-slow
     @debugtask begin
         println("path received")
-        if isempty(obstacles)
-            println("obstacles not yet assigned, do nothing")
+        if (obstacles === Ref{PolyhedronArray}()) || (traj_received === Ref{SplineTrajectory}())
+            println("do nothing")
         else 
+            # println(fieldnames(traj))
             wpts =Vector{SVector{3, Float64}}([])
             for point in msg.points
                 push!(wpts, @SVector[point.x, point.y, point.z])
             end #This correctly convert messages to SVector
-            solver = ALTROSolver(Quadrotor_kr(traj = wpts, obstacles = obstacles)..., verbose=0)
+            solver = ALTROSolver(Quadrotor_kr(traj = wpts, obstacles = obstacles[], time_total = traj_received[].data[1].t_total)..., verbose=0)
             Z0 = deepcopy(get_trajectory(solver))
             TO.initial_trajectory!(solver,Z0)
             solve!(solver)
@@ -76,6 +79,17 @@ function path_callback(msg::Marker, pub_obj::Publisher{Marker})
             ilqr = Altro.get_ilqr(solver)
             K = ilqr.K  # feedback gain matrices
             d = ilqr.d  # feedforward gains. Should be small.
+            # p = plot(X[:,1], label="refined path x")
+            # p2 = plot(U[:,1], label="refined ctrl")
+            # plot!(X[:,2], label="refined path y")
+            # plot!(X[:,3], label="refined path z")
+            # plot!(X[:,8], label="vx")
+            # plot!(X[:,9], label="vy")
+            # plot!(X[:,10], label="vz")
+            # plot!(wpts[:,1], wpts[:,2], wpts[:,3], label="original path")
+            # legend()
+            # savefig(p, "refined_path.png")
+            # savefig(p2, "refined_ctrl.png")
 
             send_msg = deepcopy(msg)
             send_msg.points = Point[]
@@ -94,10 +108,17 @@ end
 function obs_callback(msg::PolyhedronArray)
     @debugtask begin
         println("obstacles updated")
-        obstacles = msg
+        obstacles[] = msg
     end
 end
 
+function spline_callback(msg::SplineTrajectory)
+    @debugtask begin
+        println("traj updated")
+        traj_received[] = msg
+        # println(traj_received.data[1].t_total)
+    end
+end
 
 
 # function foo_callback(msg)
@@ -125,7 +146,8 @@ function main()
     # sub = Subscriber{Pose2D}("pose", callback, (pub,), queue_size=10)
     
     sub1 = Subscriber{Marker}("/quadrotor/local_plan_server/trajectory_planner/kino_astar_list", path_callback, (pub,), queue_size=1)
-    sub2 = Subscriber{PolyhedronArray}("/quadrotor/local_plan_server/trajectory_planner/sikangpolyhedron", obs_callback; queue_size=10)
+    sub2 = Subscriber{PolyhedronArray}("/quadrotor/local_plan_server/trajectory_planner/sikangpolyhedron", obs_callback; queue_size=1)
+    sub3 = Subscriber{SplineTrajectory}("/quadrotor/local_plan_server/trajectory", spline_callback; queue_size=1)
     # sub3 = Subscriber{Marker} # PlanTwoPointActionGoal  ## we want this to have initial velocity and attitude but it doesnt have it
     spin()
 end
