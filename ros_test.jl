@@ -62,15 +62,17 @@ function path_callback(msg::Marker, pub_obj::Publisher{Marker})
     #ToDo: compile to obj save startup time https://stackoverflow.com/questions/73599900/julia-seems-to-be-very-slow
     @debugtask begin
         println("path received")
-        if (obstacles === Ref{PolyhedronArray}()) || (traj_received === Ref{SplineTrajectory}())
-            println("do nothing")
+        if isnothing(obstacles[])
+            println("no obstacles")
+        elseif isnothing(traj_received[])
+            println("no spline")
         else 
             # println(fieldnames(traj))
             wpts =Vector{SVector{3, Float64}}([])
             for point in msg.points
                 push!(wpts, @SVector[point.x, point.y, point.z])
             end #This correctly convert messages to SVector
-            solver = ALTROSolver(Quadrotor_kr(traj = wpts, obstacles = obstacles[], time_total = traj_received[].data[1].t_total)..., verbose=0)
+            solver = ALTROSolver(Quadrotor_kr(traj_ref = wpts, obstacles = obstacles[], time_total = traj_received[].data[1].t_total)..., verbose=0)
             Z0 = deepcopy(get_trajectory(solver))
             TO.initial_trajectory!(solver,Z0)
             solve!(solver)

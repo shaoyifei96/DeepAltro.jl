@@ -1,20 +1,24 @@
-function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj, obstacles, time_total,
+function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, obstacles, time_total,
         costfun=:Quadratic, normcon=false)
         model = RobotZoo.Quadrotor{Rot}()
         n,m = RD.dims(model)
 
         opts = SolverOptions(
             penalty_scaling=100.,
-            penalty_initial=0.1,
+            penalty_initial=1.0,
+            projected_newton=false,
         )
 
         # discretization
         N = 101 # number of knot points
+        u0 = @SVector fill(0.5*9.81/4, m) #TODO: Change to actual vehicle mass
+
         tf = convert(Float64, time_total) # Assigned from SplineTrajectory segment 0 total_time
+        # what is a reasonable longest final time!?
         dt = tf/(N-1) # total time
 
         # Initial condition
-        x0_pos = traj[1] #this is planning in local coordinates
+        x0_pos = traj_ref[1] #this is planning in local coordinates
         x0 = RobotDynamics.build_state(model, x0_pos, UnitQuaternion(I), zeros(3), zeros(3))
 
         # cost
@@ -34,10 +38,11 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj, obstacles, time_total,
         elseif costfun == :ErrorQuad
             cost_nom = ErrorQuadratic(model, Diagonal(Q_diag[rm_quat])*dt, R*dt, x_nom)
         else
-            cost_nom = LQRCost(Q*dt, R*dt, x_nom)
+            cost_nom = LQRCost(Q*dt, R*dt, x_nom, u0)
         end
 
-        traj = traj[1:7:end] #about 50/7 = 7 points
+        traj = traj_ref[1:7:end] #about 50/7 = 7 points
+        # how many waypoints do you leave behind
         # waypoints
         times = round.(Int, range(1, stop=101, length=length(traj)))
         println("length of traj is $(length(traj))")
@@ -63,7 +68,7 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj, obstacles, time_total,
                 Qd = diag(Q)
                 ErrorQuadratic(model, Diagonal(Qd[rm_quat]), R, xg)
             else
-                LQRCost(Q, R, xg)
+                LQRCost(Q, R, xg, u0)
             end
         end
         # println(times)
@@ -88,7 +93,6 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj, obstacles, time_total,
         obj = Objective(costs_all)
 
         # Initialization
-        u0 = @SVector fill(0.5*9.81/4, m)
         U_hover = [copy(u0) for k = 1:N-1] # initial hovering control trajectory
 
         # Constraints
