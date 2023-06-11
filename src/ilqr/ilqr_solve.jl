@@ -47,7 +47,7 @@ function solve!(solver::iLQRSolver)
         J_prev = TO.cost(solver, solver.Z̄)
         
         # DelimitedFiles.writedlm("./data/raw/run_"*string(solver.problem_idx)*"_iter_"*lpad(string(solver.stats.iterations), 3, "0")*"_time_vec.txt",solver.Z̄.times,',')
-        DelimitedFiles.writedlm("./data/raw_rich/run_"*string(solver.problem_idx)*"_iter_"*lpad(string(solver.stats.iterations), 3, "0")*"_knot_vec.txt",solver.Z̄.data,',')
+        # DelimitedFiles.writedlm("./data/raw_rich/run_"*string(solver.problem_idx)*"_iter_"*lpad(string(solver.stats.iterations), 3, "0")*"_knot_vec.txt",solver.Z̄.data,',')
 
         # Calculate expansions
         # TODO: do this in parallel
