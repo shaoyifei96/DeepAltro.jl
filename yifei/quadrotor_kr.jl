@@ -18,7 +18,7 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         )
 
         # discretization
-        N = 100 # number of knot points
+        N = length(traj_ref) # number of knot points
         u0 = @SVector fill(0.5*9.81/4, m) #TODO: Change to actual vehicle mass
 
         tf = convert(Float64, t_vec[end]) # Assigned from SplineTrajectory segment 0 total_time
@@ -52,12 +52,12 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         traj = traj_ref #about 50/7 = 7 points
         # how many waypoints do you leave behind
         # waypoints
-        times = 1:100 #round.(Int, range(1, stop=101, length=length(traj)))
+        times = 1:N #round.(Int, range(1, stop=101, length=length(traj)))
         println("length of traj is $(length(traj))")
         # times = [33, 66, 101]
-        Qw_diag = Dynamics.fill_state(model, 0, 0.0,0.0,0.0)
+        Qw_diag = Dynamics.fill_state(model, 10, 0.0,0.0,0.0) #no waypoint cost since only the final point matters
                                         #    x   q:1*sq v:1 w:1
-        Qf_diag = Dynamics.fill_state(model, 10., 0.0, 10, 10)
+        Qf_diag = Dynamics.fill_state(model, 10., 0.0, 10, 0.0)
         xf = Dynamics.build_state(model, traj[end], UnitQuaternion(I), vel_ref[end], zeros(3))
 
         costs = map(1:length(traj)) do i
@@ -114,7 +114,40 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
             end
         end
         bnd = BoundConstraint(n,m, u_min=0.0, u_max=12.0)
+        
         add_constraint!(conSet, bnd, 1:N-1)
+
+
+
+        #need to build constraints: depending on which position is in polytope, move to next one 
+        #if 1 in poly, 2 in poly, 3 not in poly, then assign poly constraint to 1 and 2
+        polytope_counter = 1
+        traj_counter = 1
+        result_mat = zeros(Int8, length(traj), length(obstacles))
+        #make a double for loop to check if each point is in each polytope
+        debug_flag = false
+        if debug_flag 
+            for i = 1:length(traj)
+                for j = 1:length(obstacles)
+                    result_mat[i,j] = all(obstacles[j][1]*traj[i]-obstacles[j][2] .<= 0.0)
+                end
+            end
+            display(result_mat)
+            exit()
+        end
+        while traj_counter <= length(traj) && polytope_counter <= length(obstacles)
+            poly = obstacles[polytope_counter]
+            if  all(poly[1]*traj[traj_counter]-poly[2] .<= 0.0)
+                println("""Adding constraint, point $traj_counter is in polytope $polytope_counter""")
+                add_constraint!(conSet, LinearConstraint(n,m,poly[1], poly[2],Inequality(),1:3), traj_counter)
+                traj_counter += 1
+            else
+                polytope_counter += 1
+            end
+        end
+        if traj_counter < length(traj)
+            println("Warning: not all traj initialized points are in polytopes")
+        end
 
         # Problem
         prob = Problem(model, obj, x0, tf, xf=xf, constraints=conSet)
