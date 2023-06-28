@@ -18,6 +18,7 @@ using TimerOutputs
 using ForwardDiff
 using FiniteDiff
 import Octavian
+using Accessors
 
 const TO = TrajectoryOptimization
 const RD = RobotDynamics

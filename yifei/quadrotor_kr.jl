@@ -19,7 +19,7 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
 
         # discretization
         N = length(traj_ref) # number of knot points
-        u0 = @SVector fill(0.5*9.81/4, m) #TODO: Change to actual vehicle mass
+        # u0 = @SVector fill(0.5*9.81/4, m) #TODO: Change to actual vehicle mass
 
         tf = convert(Float64, t_vec[end]) # Assigned from SplineTrajectory segment 0 total_time
         # what is a reasonable longest final time!?
@@ -30,12 +30,12 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         x0 = RobotDynamics.build_state(model, x0_pos, UnitQuaternion(I), vel_ref[1], zeros(3))
 
         # cost
-        costfun == :QuatLQR ? sq = 0 : sq = 1
-        rm_quat = @SVector [1,2,3,4,5,6,8,9,10,11,12,13]
+        # costfun == :QuatLQR ? sq = 0 : sq = 1
+        # rm_quat = @SVector [1,2,3,4,5,6,8,9,10,11,12,13]
         Q_diag = Dynamics.fill_state(model, 1e-5, 0.0, 0.0, 0.0)
                                     #       x         q:1e-5*sq      v 1e-3    w
-        Q = Diagonal(Q_diag)
-        R = Diagonal(@SVector fill(1e-2,m))
+        # Q = Diagonal(Q_diag)
+        R = Diagonal(@SVector fill(1e-2,m)) 
         q_nom = UnitQuaternion(I)
         v_nom, ω_nom = zeros(3), zeros(3)
         # x_nom = Dynamics.build_state(model, zeros(3), q_nom, v_nom, ω_nom)
@@ -48,6 +48,7 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         # else
         #     cost_nom = LQRCost(Q*dt, R*dt, x_nom, u0)
         # end
+        U_hover = [MM * v for v in FM_ref] # inital reference input control
 
         traj = traj_ref #about 50/7 = 7 points
         # how many waypoints do you leave behind
@@ -55,7 +56,7 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         times = 1:N #round.(Int, range(1, stop=101, length=length(traj)))
         println("length of traj is $(length(traj))")
         # times = [33, 66, 101]
-        Qw_diag = Dynamics.fill_state(model, 10, 0.0,0.0,0.0) #no waypoint cost since only the final point matters
+        Qw_diag = Dynamics.fill_state(model, 0, 0.0,0,0.0) #no waypoint cost since only the final point matters
                                         #    x   q:1*sq v:1 w:1
         Qf_diag = Dynamics.fill_state(model, 10., 0.0, 10, 0.0)
         xf = Dynamics.build_state(model, traj[end], UnitQuaternion(I), vel_ref[end], zeros(3))
@@ -64,19 +65,19 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
             xg = Dynamics.build_state(model, traj[i], q_nom, vel_ref[i], ω_nom)
             if times[i] == N
                 Q = Diagonal(Qf_diag)
-                w = 4.0
+                # w = 4.0
             else
-                Q = Diagonal(1e-3*Qw_diag) * dt
-                w = 0.1
+                Q = Diagonal(Qw_diag) * dt
+                # w = 0.1
             end
-            if costfun == :QuatLQR
-                QuatLQRCost(Q, R*dt, xg, w=w)
-            elseif costfun == :ErrorQuad
-                Qd = diag(Q)
-                ErrorQuadratic(model, Diagonal(Qd[rm_quat]), R, xg)
-            else
-                LQRCost(Q, R, xg, u0)
-            end
+            # if costfun == :QuatLQR
+            #     QuatLQRCost(Q, R*dt, xg, w=w)
+            # elseif costfun == :ErrorQuad
+            #     Qd = diag(Q)
+            #     ErrorQuadratic(model, Diagonal(Qd[rm_quat]), R, xg)
+            # else
+            LQRCost(Q, R, xg, U_hover[i])
+            # end
         end
         # println(times)
         costs_all = map(1:N) do k
@@ -96,10 +97,10 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         # println(typeof(costs[1]))
         # println(typeof(cost_nom))
         
-        obj = Objective(costs_all)
+        obj = Objective(costs)
 
         # Initialization
-        U_hover = [MM * v for v in FM_ref] # inital reference input control
+        
 
         # U_hover = [copy(u0) for k = 1:N-1] # initial hovering control trajectory
 
@@ -123,10 +124,11 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         #if 1 in poly, 2 in poly, 3 not in poly, then assign poly constraint to 1 and 2
         polytope_counter = 1
         traj_counter = 1
-        result_mat = zeros(Int8, length(traj), length(obstacles))
+        
         #make a double for loop to check if each point is in each polytope
         debug_flag = false
         if debug_flag 
+            result_mat = zeros(Int8, length(traj), length(obstacles))
             for i = 1:length(traj)
                 for j = 1:length(obstacles)
                     result_mat[i,j] = all(obstacles[j][1]*traj[i]-obstacles[j][2] .<= 0.0)
@@ -135,19 +137,33 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
             display(result_mat)
             exit()
         end
-        while traj_counter <= length(traj) && polytope_counter <= length(obstacles)
+        # while traj_counter <= length(traj) && polytope_counter <= length(obstacles)
+        #     poly = obstacles[polytope_counter]
+        #     if  all(poly[1]*traj[traj_counter]-poly[2] .<= 0.0)
+        #         println("""Adding constraint, point $traj_counter is in polytope $polytope_counter""")
+        #         add_constraint!(conSet, LinearConstraint(n,m,-poly[1], -poly[2],Inequality(),1:3), traj_counter)
+        #         traj_counter += 1
+        #     else
+        #         polytope_counter += 1
+        #     end
+        # end
+        # if traj_counter < length(traj)
+        #     println("Warning: not all traj initialized points are in polytopes")
+        # end
+
+        polytope_counter = length(obstacles)
+        traj_counter = length(traj)
+        while traj_counter >= 1 && polytope_counter >= 1
             poly = obstacles[polytope_counter]
             if  all(poly[1]*traj[traj_counter]-poly[2] .<= 0.0)
                 println("""Adding constraint, point $traj_counter is in polytope $polytope_counter""")
-                add_constraint!(conSet, LinearConstraint(n,m,poly[1], poly[2],Inequality(),1:3), traj_counter)
-                traj_counter += 1
+                add_constraint!(conSet, LinearConstraint(n,m,-poly[1], -poly[2],Inequality(),1:3), traj_counter)
+                traj_counter -= 1
             else
-                polytope_counter += 1
+                polytope_counter -= 1
             end
         end
-        if traj_counter < length(traj)
-            println("Warning: not all traj initialized points are in polytopes")
-        end
+        
 
         # Problem
         prob = Problem(model, obj, x0, tf, xf=xf, constraints=conSet)

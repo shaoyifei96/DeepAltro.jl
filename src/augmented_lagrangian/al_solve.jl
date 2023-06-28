@@ -56,6 +56,7 @@ function solve!(solver::ALSolver)
 
         # Outer loop updates
         dualupdate!(conset)
+        # lin_cons_update!(conset,Z̄)
         penaltyupdate!(conset)
 
         # Reset iLQR solver
@@ -67,6 +68,108 @@ function solve!(solver::ALSolver)
     solver.opts.gradient_tolerance = grad_tol
     terminate!(solver)
     return solver
+end
+
+function lin_cons_update!(conset::ALConstraintSet, Z̄::SampledTrajectory)
+    #need to get all polytopes as A,b matrices
+    println("going through cons")
+    #save the linear constraints into another array
+    lincons_A = []
+    lincons_b = []
+    large_λ_arr = Vector{Bool}()
+    idx_needs_change = Vector{Int}()
+    
+    for alcon in conset.constraints
+        if isa(alcon.con, TO.LinearConstraint{})
+            # println("linear constraint")
+            # check if constraint unique, if yes, add to lincons
+            if !any([A == alcon.con.A for A in lincons_A])
+                # display(alcon.con.A)
+                push!(lincons_A, alcon.con.A)
+                push!(lincons_b, alcon.con.b)
+            end
+        end
+    end
+    # splice!(conset.constraints, 2)
+    for alcon_idx in 1:length(conset.constraints)
+        alcon = conset.constraints[alcon_idx]
+        if isa(alcon.con, TO.LinearConstraint{})
+            max_λ = maximum(alcon.λ[1])
+            println("Max lamda = ",max_λ)
+            if max_λ > 1e2
+                for i in 1:length(lincons_A)
+                    println(i)
+                    cur_state = state(Z̄[alcon.inds[1]])
+                    if minimum(lincons_A[i]*cur_state[1:3] .- lincons_b[i]) > 0.0
+                        @set alcon.con = TO.LinearConstraint(13,4,lincons_A[i], lincons_b[i],Inequality(),1:3)
+                        # @set alcon.con.b = lincons_b[i]
+                        # replace_con_ineq = 
+                        # replace_con = ALConstraint{Float64}(Z̄, replace_con_ineq, alcon.inds)
+                        # println("switching constraint")
+                        # # simply remove this constraint and add a new one in the same indexed position
+                        # #!!!![FATAL] [1687809539.259629]: Error: setfield! immutable struct of type ALConstraint cannot be changed
+
+                        # # alcon.con.A = lincons_A[i]
+                        # # alcon.con.b = lincons_b[i]
+                        # splice!(conset.constraints, alcon_idx, replace_con)
+                        break
+                    end
+                end
+            end
+        end
+    end
+    
+                
+
+    #             max_λ = maximum(alcon.λ[1])
+    #             idx_needs_change = push!(idx_needs_change, alcon.inds[1])
+    #             if max_λ > 1e5
+    #                 push!(large_λ_arr, true)
+    #             else
+    #                 push!(large_λ_arr, false)
+    #             end
+    #         end
+    #         push!(lincons, alcon.con)
+    #         max_λ = maximum(alcon.λ[1])
+    #         idx_needs_change = push!(idx_needs_change, alcon.inds[1])
+    #         if max_λ > 1e5
+    #             push!(large_λ_arr, true)
+    #         else
+    #             push!(large_λ_arr, false)
+    #         end
+    #     end
+    # end
+    # for  
+        # RD.evaluate(con::LinearConstraint, z::AbstractKnotPoint) = con.A*RD.getdata(z)[con.inds] .- con.b
+    # check if trajectory current position is in any other polytope
+                
+                #if yes, then switch the constraint to that polytope
+        # println(typeof(alcon))
+        # println(alcon.inds)
+        # display(alcon.λ)
+
+            
+
+
+        # for i in eachindex(alcon.inds)
+        #     λ, μ, c = alcon.λ[i], alcon.μ[i], alcon.vals[i]
+            # conval = alcon.con[i]
+            # println(typeof(conval))
+            # if isa(conval, LinearConstraint{}) 
+            #     println("Linear constraint max value is: ", maximum(conval.λ))
+            #     println(typeof(conval))
+            # end
+        # end
+        # c = conval.vals
+        # λ = conval.λ
+        # μ = conval.μ
+	    # λ_max = conval.params.λ_max
+	    # cone = TO.sense(conval.con)
+	# λ_min = TO.sense(conval.con) == Equality() ? -λ_max : zero(λ_max)
+        # for i in eachindex(conval.inds)
+        #     λ[i] .= dual_update(cone, SVector(λ[i]), SVector(c[i]), SVector(μ[i]), λ_max) 
+        # end
+    
 end
 
 function record_iteration!(solver::ALSolver, J, c_max, μ_max)

@@ -1,4 +1,5 @@
 # Set up problem using TrajectoryOptimization.jl and RobotZoo.jl
+import Pkg; Pkg.activate(@__DIR__); Pkg.instantiate()
 using TrajectoryOptimization
 using Altro
 import RobotZoo.Cartpole
@@ -32,6 +33,16 @@ bnd = BoundConstraint(n,m, u_min=-u_bnd, u_max=u_bnd)
 goal = GoalConstraint(xf)
 add_constraint!(conSet, bnd, 1:N-1)
 add_constraint!(conSet, goal, N)
+
+
+# Linear Constraint
+p = 5
+A = @SMatrix rand(p,n+m)
+b = @SVector rand(p)
+lin = LinearConstraint(n,m,A,b, Inequality())
+
+add_constraint!(conSet, lin, 3)
+add_constraint!(conSet, lin, 20)
 
 # Initialization
 u0 = @SVector fill(0.01,m)

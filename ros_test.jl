@@ -38,6 +38,8 @@ using Altro: ALTROSolver
 using Rotations
 using Plots
 
+
+
 include("./yifei/quadrotor_kr.jl")
 
 obstacles = []# Ref{PolyhedronArray}() # Store it into a `Ref` which it's mutable but has a constant type
@@ -98,7 +100,7 @@ function path_callback(msg::TrajectoryDiscretized, pub_obj::Publisher{Marker})
             U_hover = [MM * v for v in FM]
             # end of debug
 
-            solver = ALTROSolver(Quadrotor_kr(traj_ref = wpts, vel_ref = vel, FM_ref = FM, obstacles = obstacles, t_vec = msg.t)..., verbose=0)
+            solver = ALTROSolver(Quadrotor_kr(traj_ref = wpts, vel_ref = vel, FM_ref = FM, obstacles = [], t_vec = msg.t)..., verbose=0)
             Z0 = deepcopy(get_trajectory(solver))
             TO.initial_trajectory!(solver,Z0)
             solve!(solver)
@@ -109,7 +111,7 @@ function path_callback(msg::TrajectoryDiscretized, pub_obj::Publisher{Marker})
             K = ilqr.K  # feedback gain matrices
             d = ilqr.d  # feedforward gains. Should be small.
 
-            plotting_bool = false
+            plotting_bool = true
             if plotting_bool
                 x_plot = [v[1] for v in X]
                 y_plot = [v[2] for v in X]
