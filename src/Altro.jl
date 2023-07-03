@@ -19,6 +19,7 @@ using ForwardDiff
 using FiniteDiff
 import Octavian
 using Accessors
+using Debugger
 
 const TO = TrajectoryOptimization
 const RD = RobotDynamics
@@ -56,6 +57,7 @@ using RobotDynamics:
 export
     ALTROSolverOld,
     ALTROSolver,
+    ALConstraint,
     # iLQRSolverOld,
     # AugmentedLagrangianSolver,
     SolverStats,

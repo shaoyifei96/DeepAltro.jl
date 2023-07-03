@@ -15,6 +15,7 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
             penalty_scaling=100.,
             penalty_initial=1.0,
             projected_newton=false,
+            iterations_outer = 60
         )
 
         # discretization
@@ -22,6 +23,7 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         # u0 = @SVector fill(0.5*9.81/4, m) #TODO: Change to actual vehicle mass
 
         tf = convert(Float64, t_vec[end]) # Assigned from SplineTrajectory segment 0 total_time
+        println("tf: ", tf)
         # what is a reasonable longest final time!?
         dt = tf/(N-1) # total time
 

@@ -56,7 +56,7 @@ function solve!(solver::ALSolver)
 
         # Outer loop updates
         dualupdate!(conset)
-        # lin_cons_update!(conset,Z̄)
+        lin_cons_update!(conset)
         penaltyupdate!(conset)
 
         # Reset iLQR solver
@@ -70,14 +70,14 @@ function solve!(solver::ALSolver)
     return solver
 end
 
-function lin_cons_update!(conset::ALConstraintSet, Z̄::SampledTrajectory)
+function lin_cons_update!(conset::ALConstraintSet)
     #need to get all polytopes as A,b matrices
     println("going through cons")
     #save the linear constraints into another array
     lincons_A = []
     lincons_b = []
-    large_λ_arr = Vector{Bool}()
-    idx_needs_change = Vector{Int}()
+    # large_λ_arr = Vector{Bool}()
+    # idx_needs_change = Vector{Int}()
     
     for alcon in conset.constraints
         if isa(alcon.con, TO.LinearConstraint{})
@@ -95,26 +95,38 @@ function lin_cons_update!(conset::ALConstraintSet, Z̄::SampledTrajectory)
         alcon = conset.constraints[alcon_idx]
         if isa(alcon.con, TO.LinearConstraint{})
             max_λ = maximum(alcon.λ[1])
-            println("Max lamda = ",max_λ)
-            if max_λ > 1e2
+            # println("Max lamda = ",max_λ)
+            if max_λ > 30.0
+                dist_to_obs = zeros(length(lincons_A))
+                cur_state = state(alcon.Z[1][alcon.inds[1]])
                 for i in 1:length(lincons_A)
-                    println(i)
-                    cur_state = state(Z̄[alcon.inds[1]])
-                    if minimum(lincons_A[i]*cur_state[1:3] .- lincons_b[i]) > 0.0
-                        @set alcon.con = TO.LinearConstraint(13,4,lincons_A[i], lincons_b[i],Inequality(),1:3)
-                        # @set alcon.con.b = lincons_b[i]
-                        # replace_con_ineq = 
-                        # replace_con = ALConstraint{Float64}(Z̄, replace_con_ineq, alcon.inds)
-                        # println("switching constraint")
-                        # # simply remove this constraint and add a new one in the same indexed position
-                        # #!!!![FATAL] [1687809539.259629]: Error: setfield! immutable struct of type ALConstraint cannot be changed
-
-                        # # alcon.con.A = lincons_A[i]
-                        # # alcon.con.b = lincons_b[i]
-                        # splice!(conset.constraints, alcon_idx, replace_con)
-                        break
+                    if lincons_A[i] == alcon.con.A
+                        dist_to_obs[i] = -1000.0
+                    else
+                        dist_to_obs[i] = minimum(lincons_A[i]*cur_state[1:3] .- lincons_b[i])
                     end
                 end
+                # print(dist_to_obs)
+                max_val, max_idx = findmax(dist_to_obs)#find the most comfortable constraint
+                if max_val > -1.0 #if the constraint is violated a little bit
+                    println("Found replacing constraint")
+                    stagecon = TO.LinearConstraint(13,4,lincons_A[max_idx], lincons_b[max_idx],Inequality(),1:3)
+                    conset.constraints[alcon_idx] = ALConstraint{Float64}(alcon.Z[1], stagecon, alcon.inds, zeros(100)) 
+                    # println("Found replacing constraint")
+                    # @set alcon.con = TO.LinearConstraint(13,4,lincons_A[i], lincons_b[i],Inequality(),1:3)
+                    # @set alcon.con.b = lincons_b[i]
+                    # replace_con_ineq = 
+                    # replace_con = ALConstraint{Float64}(Z̄, replace_con_ineq, alcon.inds)
+                    # println("switching constraint")
+                    # # simply remove this constraint and add a new one in the same indexed position
+                    # #!!!![FATAL] [1687809539.259629]: Error: setfield! immutable struct of type ALConstraint cannot be changed
+
+                    # # alcon.con.A = lincons_A[i]
+                    # # alcon.con.b = lincons_b[i]
+                    # splice!(conset.constraints, alcon_idx, replace_con)
+                    break
+                end
+                
             end
         end
     end
