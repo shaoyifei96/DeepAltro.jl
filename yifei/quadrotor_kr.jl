@@ -137,7 +137,8 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
                 end
             end
             display(result_mat)
-            exit()
+            println("End Matrix")
+            # exit()
         end
         # while traj_counter <= length(traj) && polytope_counter <= length(obstacles)
         #     poly = obstacles[polytope_counter]
@@ -152,21 +153,105 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         # if traj_counter < length(traj)
         #     println("Warning: not all traj initialized points are in polytopes")
         # end
-
-        polytope_counter = length(obstacles)
-        traj_counter = length(traj)
-        while traj_counter >= 1 && polytope_counter >= 1
+        conSettemp = ConstraintList(n,m,N)
+        start_end_mat = zeros(Int8,0,2)
+        for polytope_counter = 1:length(obstacles)
+            obs_start = 0
+            obs_end   = 0
+            poly_res_start = ones(Bool, length(obstacles[polytope_counter][2])) #false if point not in polytope
+            poly_res_end   = ones(Bool, length(obstacles[polytope_counter][2]))
             poly = obstacles[polytope_counter]
-            if  all(poly[1]*traj[traj_counter]-poly[2] .<= 0.0)
-                println("""Adding constraint, point $traj_counter is in polytope $polytope_counter""")
-                add_constraint!(conSet, LinearConstraint(n,m,-poly[1], -poly[2],Inequality(),1:3), traj_counter)
-                traj_counter -= 1
-            else
-                polytope_counter -= 1
+            for traj_counter = 1:length(traj)
+                poly_res = poly[1]*traj[traj_counter]-poly[2] .<= 0.0
+                if all(poly_res) && obs_start == 0
+                    obs_start = traj_counter
+                    if traj_counter > 1
+                        poly_res_start = poly[1]*traj[traj_counter-1]-poly[2] .<= 0.0
+                    end
+                    # this line shows when traj first enters the polytope 
+                    # what constraints are satisfied for the previous point
+                elseif all(poly_res) && obs_start != 0
+                     #inside polytope
+                elseif !all(poly_res) && obs_start != 0
+                    poly_res_end = poly[1]*traj[traj_counter]-poly[2] .<= 0.0
+                    obs_end = traj_counter-1
+                    break
+                elseif !all(poly_res) && obs_start == 0
+                    continue #have not entered polytope yet
+                end
+                #if inside polytope all the way to end
+                obs_end = length(traj)
             end
+            println("polytope $polytope_counter")
+            println(poly_res_start, poly_res_end)
+            poly_res_all = poly_res_start .& poly_res_end
+            println(poly_res_all)
+            if obs_start == 0
+                println("Warning: polytope $polytope_counter not in trajectory")
+                continue
+            end
+            start_end_mat = [start_end_mat; [obs_start, obs_end]']
+            newcon = LinearConstraint(n,m,poly[1][poly_res_all,:], poly[2][poly_res_all],Inequality(),1:3) 
+            add_constraint!(conSettemp, newcon,1)
         end
-        
+        display(start_end_mat)
+        for i = 1:length(conSettemp)
+            if i == 1
+                start_idx = start_end_mat[i,1]
+            else 
+                if start_end_mat[i-1,2] > start_end_mat[i,1]
+                    start_idx = (start_end_mat[i-1,2] + start_end_mat[i,1]) ÷ 2
+                else
+                    start_idx = start_end_mat[i,1]
+                end
+            end
 
+            if i == length(conSettemp)
+                last_idx = start_end_mat[i,2]
+            else
+                if start_end_mat[i,2] > start_end_mat[i+1,1]
+                    last_idx = (start_end_mat[i,2] + start_end_mat[i+1,1]) ÷ 2
+                else
+                    last_idx = start_end_mat[i,2]
+                end
+            end
+            add_constraint!(conSet, conSettemp[i], start_idx:last_idx)
+            println("adding constraint $i from $start_idx to $last_idx")
+        end
+
+
+        ## this function does not take into account of two sided walls
+        # polytope_counter = length(obstacles)
+        # traj_counter = length(traj)
+        # last_idx = length(traj)
+        # while traj_counter >= 0 && polytope_counter >= 1
+        #     poly = obstacles[polytope_counter]
+        #     if traj_counter == 0
+        #         poly_res = zeros(Bool, length(poly[2]))
+        #     else
+        #         poly_res = poly[1]*traj[traj_counter]-poly[2] .<= 0.0
+        #     end
+        #     if  all(poly_res)
+        #         traj_counter -= 1
+        #     else
+        #         if traj_counter >= last_idx
+        #             polytope_counter -= 1
+        #         else
+        #             newcon = LinearConstraint(n,m,-poly[1][.!poly_res,:], -poly[2][.!poly_res],Inequality(),1:3) 
+        #             add_constraint!(conSet, newcon, (traj_counter+1):last_idx)
+        #             println("""Adding constraint $(traj_counter+1) to $last_idx is in polytope $polytope_counter""")
+        #             polytope_counter -= 1
+        #             last_idx = traj_counter
+        #         end
+        #     end
+        # end
+        # if traj_counter < last_idx
+        #     newcon = LinearConstraint(n,m,-poly[1][.!poly_res,:], -poly[2][.!poly_res],Inequality(),1:3) 
+        #     add_constraint!(conSet, newcon, 1:last_idx)
+        #     println("""Adding constraint 1 to $last_idx is in polytope $polytope_counter""")
+        # end
+        
+# exit()
         # Problem
         prob = Problem(model, obj, x0, tf, xf=xf, constraints=conSet)
         initial_controls!(prob, U_hover)

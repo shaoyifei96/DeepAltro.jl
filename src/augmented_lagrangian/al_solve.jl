@@ -56,7 +56,7 @@ function solve!(solver::ALSolver)
 
         # Outer loop updates
         dualupdate!(conset)
-        lin_cons_update!(conset)
+        # lin_cons_update!(conset)
         penaltyupdate!(conset)
 
         # Reset iLQR solver
