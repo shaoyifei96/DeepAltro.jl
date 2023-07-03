@@ -144,12 +144,19 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         # end
         conSettemp = ConstraintList(n,m,N)
         start_end_mat = zeros(Int8,0,2)
-        for polytope_counter = 1:length(obstacles)
+        polytope_counter = 1
+        polytope_reverse_vec = zeros(Bool, length(obstacles))
+        exit_flag = false
+        while !exit_flag
             obs_start = 0
             obs_end   = 0
             poly_res_start = ones(Bool, length(obstacles[polytope_counter][2])) #false if point not in polytope
             poly_res_end   = ones(Bool, length(obstacles[polytope_counter][2]))
             poly = obstacles[polytope_counter]
+            if polytope_reverse_vec[polytope_counter]
+                poly= (-poly[1], -poly[2])
+            end
+
             for traj_counter = 1:length(traj)
                 poly_res = poly[1]*traj[traj_counter]-poly[2] .<= 0.0
                 if all(poly_res) && obs_start == 0
@@ -157,9 +164,14 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
                     if traj_counter > 1
                         poly_res_start = poly[1]*traj[traj_counter-1]-poly[2] .<= 0.0
                     end
+                    continue
                     # this line shows when traj first enters the polytope 
                     # what constraints are satisfied for the previous point
                 elseif all(poly_res) && obs_start != 0
+                    if traj_counter == length(traj)
+                        obs_end = length(traj)
+                        exit_flag = true
+                    end
                      #inside polytope
                 elseif !all(poly_res) && obs_start != 0
                     poly_res_end = poly[1]*traj[traj_counter]-poly[2] .<= 0.0
@@ -169,21 +181,31 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
                     continue #have not entered polytope yet
                 end
                 #if inside polytope all the way to end
-                obs_end = length(traj)
+                
             end
             println("polytope $polytope_counter")
             println(poly_res_start, poly_res_end)
             poly_res_all = poly_res_start .& poly_res_end
             println(poly_res_all)
             if obs_start == 0
-                println("Warning: polytope $polytope_counter not in trajectory")
+                println("Warning: polytope $polytope_counter reverse = $(polytope_reverse_vec[polytope_counter]) not in trajectory")
+                if polytope_reverse_vec[polytope_counter]
+                    println("Error: traj not in polytope")
+                    polytope_counter += 1
+                    if polytope_counter > length(obstacles)
+                        break
+                    end
+                end
+                polytope_reverse_vec[polytope_counter] = true
                 continue
             end
             start_end_mat = [start_end_mat; [obs_start, obs_end]']
             newcon = LinearConstraint(n,m,poly[1][poly_res_all,:], poly[2][poly_res_all],Inequality(),1:3) 
             add_constraint!(conSettemp, newcon,1)
+            polytope_counter += 1
         end
         display(start_end_mat)
+        println(polytope_reverse_vec)
         for i = 1:length(conSettemp)
             if i == 1
                 start_idx = start_end_mat[i,1]
