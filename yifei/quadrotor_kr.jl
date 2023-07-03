@@ -20,7 +20,7 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
 
         # discretization
         N = length(traj_ref) # number of knot points
-        # u0 = @SVector fill(0.5*9.81/4, m) #TODO: Change to actual vehicle mass
+        u0 = @SVector fill(0.5*9.81/4, m) #TODO: Change to actual vehicle mass
 
         tf = convert(Float64, t_vec[end]) # Assigned from SplineTrajectory segment 0 total_time
         println("tf: ", tf)
@@ -37,7 +37,7 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         Q_diag = Dynamics.fill_state(model, 1e-5, 0.0, 0.0, 0.0)
                                     #       x         q:1e-5*sq      v 1e-3    w
         # Q = Diagonal(Q_diag)
-        R = Diagonal(@SVector fill(1e-2,m)) 
+        R = Diagonal(@SVector fill(1e-1,m)) 
         q_nom = UnitQuaternion(I)
         v_nom, ω_nom = zeros(3), zeros(3)
         # x_nom = Dynamics.build_state(model, zeros(3), q_nom, v_nom, ω_nom)
@@ -58,7 +58,7 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         times = 1:N #round.(Int, range(1, stop=101, length=length(traj)))
         println("length of traj is $(length(traj))")
         # times = [33, 66, 101]
-        Qw_diag = Dynamics.fill_state(model, 0, 0.0,0,0.0) #no waypoint cost since only the final point matters
+        Qw_diag = Dynamics.fill_state(model, 0.01, 0.0,0,0.0) #no waypoint cost since only the final point matters
                                         #    x   q:1*sq v:1 w:1
         Qf_diag = Dynamics.fill_state(model, 10., 0.0, 10, 0.0)
         xf = Dynamics.build_state(model, traj[end], UnitQuaternion(I), vel_ref[end], zeros(3))
@@ -78,20 +78,11 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
             #     Qd = diag(Q)
             #     ErrorQuadratic(model, Diagonal(Qd[rm_quat]), R, xg)
             # else
-            LQRCost(Q, R, xg, U_hover[i])
+
+            # LQRCost(Q, R, xg, U_hover[i]) #cost wrt ref input or hover input?
+            LQRCost(Q, R, xg, u0)
+            
             # end
-        end
-        # println(times)
-        costs_all = map(1:N) do k
-            # println("k is $k")
-            i = findfirst(x->(x ≥ k), times)
-            # println(i)
-            if k ∈ times
-                costs[i]
-                # 
-            else
-                println("ERROR in costs_all")
-            end
         end
 
         # println(typeof(costs_all))
