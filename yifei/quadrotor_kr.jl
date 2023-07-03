@@ -50,7 +50,8 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         # else
         #     cost_nom = LQRCost(Q*dt, R*dt, x_nom, u0)
         # end
-        U_hover = [MM * v for v in FM_ref] # inital reference input control
+        U_ref = [MM * v for v in FM_ref] # inital reference input control
+        U_hover = [copy(u0) for k = 1:N-1]
 
         traj = traj_ref #about 50/7 = 7 points
         # how many waypoints do you leave behind
@@ -93,10 +94,7 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         obj = Objective(costs)
 
         # Initialization
-        
-
-        # U_hover = [copy(u0) for k = 1:N-1] # initial hovering control trajectory
-
+    
         # Constraints
         conSet = ConstraintList(n,m,N)
         if normcon
