@@ -1,5 +1,5 @@
 function Quadrotor(scenario=:zigzag, Rot=UnitQuaternion{Float64};
-        costfun=:Quadratic, normcon=false)
+        costfun=:QuatLQR, normcon=false)
     if scenario == :zigzag
         model = RobotZoo.Quadrotor{Rot}()
         n,m = RD.dims(model)
