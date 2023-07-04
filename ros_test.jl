@@ -277,7 +277,7 @@ function main()
     # sub = Subscriber{Pose2D}("pose", callback, (pub,), queue_size=10)
     
     sub1 = Subscriber{TrajectoryDiscretized}("/spline_traj_samples", path_callback, (pub,), queue_size=1)
-    sub2 = Subscriber{PolyhedronArray}("/quadrotor/local_plan_server/trajectory_planner/sikangpolyhedron", obs_callback; queue_size=1)
+    sub2 = Subscriber{PolyhedronArray}("/local_plan_server/trajectory_planner/sikangpolyhedron", obs_callback; queue_size=1)
     # sub3 = Subscriber{SplineTrajectory}("/quadrotor/local_plan_server/trajectory", spline_callback; queue_size=1)
     # sub3 = Subscriber{Marker} # PlanTwoPointActionGoal  ## we want this to have initial velocity and attitude but it doesnt have it
     spin()

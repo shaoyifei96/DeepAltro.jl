@@ -37,7 +37,7 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         Q_diag = Dynamics.fill_state(model, 1e-5, 0.0, 0.0, 0.0)
                                     #       x         q:1e-5*sq      v 1e-3    w
         # Q = Diagonal(Q_diag)
-        R = Diagonal(@SVector fill(1e-1,m)) 
+        R = Diagonal(@SVector fill(0.1,m)) 
         q_nom = UnitQuaternion(I)
         v_nom, ω_nom = zeros(3), zeros(3)
         # x_nom = Dynamics.build_state(model, zeros(3), q_nom, v_nom, ω_nom)
@@ -59,7 +59,7 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         times = 1:N #round.(Int, range(1, stop=101, length=length(traj)))
         println("length of traj is $(length(traj))")
         # times = [33, 66, 101]
-        Qw_diag = Dynamics.fill_state(model, 0.01, 0.0,0,0.0) #no waypoint cost since only the final point matters
+        Qw_diag = Dynamics.fill_state(model, 0.03, 0.0,0,0.0) #no waypoint cost since only the final point matters
                                         #    x   q:1*sq v:1 w:1
         Qf_diag = Dynamics.fill_state(model, 10., 0.0, 10, 0.0)
         xf = Dynamics.build_state(model, traj[end], UnitQuaternion(I), vel_ref[end], zeros(3))
@@ -147,7 +147,7 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         polytope_counter = 1
         polytope_reverse_vec = zeros(Bool, length(obstacles))
         exit_flag = false
-        while !exit_flag
+        while !exit_flag && polytope_counter <= length(obstacles)
             obs_start = 0
             obs_end   = 0
             poly_res_start = ones(Bool, length(obstacles[polytope_counter][2])) #false if point not in polytope
