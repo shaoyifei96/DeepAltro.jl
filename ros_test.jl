@@ -84,9 +84,10 @@ function path_callback(msg::TrajectoryDiscretized, pub_obj::Publisher{Marker})
             for i in 1:length(msg.moment)
                 push!(FM, @SVector[msg.thrust[i], msg.moment[i].x, msg.moment[i].y, msg.moment[i].z])
             end 
-            
             #debug: TODO: remove
             Rot=UnitQuaternion{Float64}
+            ini_rot = UnitQuaternion{Float64}(msg.inital_attitude.w, msg.inital_attitude.x, msg.inital_attitude.y, msg.inital_attitude.z)
+            ini_w   = @SVector [msg.initial_omega.x, msg.initial_omega.y, msg.initial_omega.z]
             model = RobotZoo.Quadrotor{Rot}()
             n,m = RD.dims(model)
             kf, km = model.kf, model.km
@@ -100,7 +101,8 @@ function path_callback(msg::TrajectoryDiscretized, pub_obj::Publisher{Marker})
             U_hover = [MM * v for v in FM]
             # end of debug
 
-            solver = ALTROSolver(Quadrotor_kr(traj_ref = wpts, vel_ref = vel, FM_ref = FM, obstacles = obstacles, t_vec = msg.t)..., verbose=0)
+            solver = ALTROSolver(Quadrotor_kr(traj_ref = wpts, vel_ref = vel, FM_ref = FM, 
+            obstacles = obstacles, t_vec = msg.t, ini_rot = ini_rot,ini_w = ini_w)..., verbose=0)
             Z0 = deepcopy(get_trajectory(solver))
             TO.initial_trajectory!(solver,Z0)
             solve!(solver)
@@ -128,15 +130,15 @@ function path_callback(msg::TrajectoryDiscretized, pub_obj::Publisher{Marker})
                 vy_ref_plot = [v[2] for v in vel]
                 vz_ref_plot = [v[3] for v in vel]
 
-                u1 = [u[1] for u in U]
-                u2 = [u[2] for u in U]
-                u3 = [u[3] for u in U]
-                u4 = [u[4] for u in U]
+                u1 = [u[1].-0.5*9.81/4 for u in U]
+                u2 = [u[2].-0.5*9.81/4 for u in U]
+                u3 = [u[3].-0.5*9.81/4 for u in U]
+                u4 = [u[4].-0.5*9.81/4 for u in U]
 
-                u1_ref = [u[1] for u in U_hover]
-                u2_ref = [u[2] for u in U_hover]
-                u3_ref = [u[3] for u in U_hover]
-                u4_ref = [u[4] for u in U_hover]
+                u1_ref = [u[1].-0.5*9.81/4 for u in U_hover]
+                u2_ref = [u[2].-0.5*9.81/4 for u in U_hover]
+                u3_ref = [u[3].-0.5*9.81/4 for u in U_hover]
+                u4_ref = [u[4].-0.5*9.81/4 for u in U_hover]
 
 
                 p = plot(T,x_plot, label="refined path x", lc=:red,ls=:solid)

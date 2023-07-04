@@ -1,5 +1,6 @@
-function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, obstacles, t_vec,
-        costfun=:Quadratic, normcon=false)
+function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, obstacles, t_vec, ini_rot, ini_w,
+        costfun=:QuadraticCost, normcon=false)
+        costfun == :QuatLQR ? sq = 0 : sq = 1
         model = RobotZoo.Quadrotor{Rot}()
         n,m = RD.dims(model)
         kf, km = model.kf, model.km
@@ -29,17 +30,16 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
 
         # Initial condition
         x0_pos = traj_ref[1] #this is planning in local coordinates
-        x0 = RobotDynamics.build_state(model, x0_pos, UnitQuaternion(I), vel_ref[1], zeros(3))
+        # x0 = RobotDynamics.build_state(model, x0_pos, ini_rot, vel_ref[1], ini_w)
+        x0 = RobotDynamics.build_state(model, x0_pos,UnitQuaternion(I) , vel_ref[1], zeros(3))
 
         # cost
         # costfun == :QuatLQR ? sq = 0 : sq = 1
-        # rm_quat = @SVector [1,2,3,4,5,6,8,9,10,11,12,13]
-        Q_diag = Dynamics.fill_state(model, 1e-5, 0.0, 0.0, 0.0)
-                                    #       x         q:1e-5*sq      v 1e-3    w
+        # rm_quat = @SVector [1,2,3,4,5,6,8,9,10,11,12,13]                                    #       x         q:1e-5*sq      v 1e-3    w
         # Q = Diagonal(Q_diag)
         R = Diagonal(@SVector fill(0.1,m)) 
         q_nom = UnitQuaternion(I)
-        v_nom, ω_nom = zeros(3), zeros(3)
+        ω_nom = zeros(3)
         # x_nom = Dynamics.build_state(model, zeros(3), q_nom, v_nom, ω_nom)
         #why is the state zero? should it follow referecne trajectory?
         
@@ -59,9 +59,11 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         times = 1:N #round.(Int, range(1, stop=101, length=length(traj)))
         println("length of traj is $(length(traj))")
         # times = [33, 66, 101]
-        Qw_diag = Dynamics.fill_state(model, 0.03, 0.0,0,0.0) #no waypoint cost since only the final point matters
+        #works well to reduce rotation a little 
+        Qw_diag = Dynamics.fill_state(model, 0.03, 0,0, 0.01) #no waypoint cost since only the final point matters
+        # Qw_diag = Dynamics.fill_state(model, 10, 0.0,0,0) #to check correctness of things
                                         #    x   q:1*sq v:1 w:1
-        Qf_diag = Dynamics.fill_state(model, 10., 0.0, 10, 0.0)
+        Qf_diag = Dynamics.fill_state(model, 1., 0.0, 1, 0.0)
         xf = Dynamics.build_state(model, traj[end], UnitQuaternion(I), vel_ref[end], zeros(3))
 
         costs = map(1:length(traj)) do i
@@ -81,7 +83,11 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
             # else
 
             # LQRCost(Q, R, xg, U_hover[i]) #cost wrt ref input or hover input?
-            LQRCost(Q, R, xg, u0)
+            if costfun == :QuatLQR
+                TO.QuatLQRCost(Q, R, xg, u0)
+            else
+                LQRCost(Q, R, xg, u0)
+            end
             
             # end
         end
