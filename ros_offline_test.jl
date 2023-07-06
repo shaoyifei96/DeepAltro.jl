@@ -33,6 +33,8 @@ using Rotations
 using Plots
 
 using Profile
+using CSV
+using DataFrames
 
 include("./yifei/quadrotor_kr.jl")
 
@@ -86,34 +88,35 @@ function problem_solving(msg, obstacles)
         K = ilqr.K  # feedback gain matrices
         d = ilqr.d  # feedforward gains. Should be small.
 
-        plotting_bool = false
+        stats = Altro.stats(solver) 
+        
+        x_plot = [v[1] for v in X]
+        y_plot = [v[2] for v in X]
+        z_plot = [v[3] for v in X]
+        vx_plot = [v[8] for v in X]
+        vy_plot = [v[9] for v in X]
+        vz_plot = [v[10] for v in X]
+
+        x_ref_plot = [v[1] for v in wpts]
+        y_ref_plot = [v[2] for v in wpts]
+        z_ref_plot = [v[3] for v in wpts]
+
+        vx_ref_plot = [v[1] for v in vel]
+        vy_ref_plot = [v[2] for v in vel]
+        vz_ref_plot = [v[3] for v in vel]
+
+        u0 = 0.5*9.81/4
+        u1 = [u[1].-u0 for u in U]
+        u2 = [u[2].-u0 for u in U]
+        u3 = [u[3].-u0 for u in U]
+        u4 = [u[4].-u0 for u in U]
+
+        u1_ref = [u[1].-u0 for u in U_hover]
+        u2_ref = [u[2].-u0 for u in U_hover]
+        u3_ref = [u[3].-u0 for u in U_hover]
+        u4_ref = [u[4].-u0 for u in U_hover]
+        plotting_bool = true
         if plotting_bool
-            x_plot = [v[1] for v in X]
-            y_plot = [v[2] for v in X]
-            z_plot = [v[3] for v in X]
-            vx_plot = [v[8] for v in X]
-            vy_plot = [v[9] for v in X]
-            vz_plot = [v[10] for v in X]
-
-            x_ref_plot = [v[1] for v in wpts]
-            y_ref_plot = [v[2] for v in wpts]
-            z_ref_plot = [v[3] for v in wpts]
-
-            vx_ref_plot = [v[1] for v in vel]
-            vy_ref_plot = [v[2] for v in vel]
-            vz_ref_plot = [v[3] for v in vel]
-
-            u1 = [u[1].-0.5*9.81/4 for u in U]
-            u2 = [u[2].-0.5*9.81/4 for u in U]
-            u3 = [u[3].-0.5*9.81/4 for u in U]
-            u4 = [u[4].-0.5*9.81/4 for u in U]
-
-            u1_ref = [u[1].-0.5*9.81/4 for u in U_hover]
-            u2_ref = [u[2].-0.5*9.81/4 for u in U_hover]
-            u3_ref = [u[3].-0.5*9.81/4 for u in U_hover]
-            u4_ref = [u[4].-0.5*9.81/4 for u in U_hover]
-
-
             p = plot(T,x_plot, label="refined path x", lc=:red,ls=:solid)
             # p2 = plot(U[:,1], label="refined ctrl")
             plot!(T,y_plot, label="refined path y",lc=:green,ls=:solid)
@@ -143,17 +146,42 @@ function problem_solving(msg, obstacles)
             savefig(p, "refined_path.png")
             savefig(p2, "refined_vel.png")
             savefig(p3, "control_inputs.png")
+
         end
     end
+    # return controls, total ilqr iterations,   TODO: total time may be not correct when doing time optimization
+    return norm(u1)+norm(u2)+norm(u3)+norm(u4) , stats.iterations, Integer(stats.status), T[end], stats.tsolve
 end
+
+problem_id_v = zeros(Int64, 0) 
+solve_time_v = zeros(Float64, 0)
+u_norm_v = zeros(Float64, 0)
+traj_time_v = zeros(Float64, 0)
+solver_iter_v = zeros(Int64, 0)
+solver_status_v = zeros(Int64, 0)
+# traj jerk cost = zeros(Float64, 0)
 
 for i = 30:129
     @load "./data/problem$i.jld2" msg obstacles total_iter
-    problem_solving(msg, obstacles)
+    u_norm, solver_iter, status, traj_time, solve_time = problem_solving(msg, obstacles)
+    push!(problem_id_v, i)
+    push!(solve_time_v, solve_time)
+    push!(u_norm_v, u_norm)
+    push!(traj_time_v, traj_time)
+    push!(solver_iter_v, solver_iter)
+    push!(solver_status_v, status)
     # msg = obj.msg 
     # obstacles = obj.obstacles
     #also avaiable: total_iter
-
     
 end
+df = DataFrame(
+problem_id = problem_id_v,    
+solve_time = solve_time_v, 
+u_norm_over_hover = u_norm_v,
+traj_time = traj_time_v,
+solver_iter = solver_iter_v,
+solver_status = solver_status_v
+               )
+CSV.write("ros_offline_stats.csv", df)
 

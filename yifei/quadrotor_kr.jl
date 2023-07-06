@@ -30,8 +30,8 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
 
         # Initial condition
         x0_pos = traj_ref[1] #this is planning in local coordinates
-        # x0 = RobotDynamics.build_state(model, x0_pos, ini_rot, vel_ref[1], ini_w)
-        x0 = RobotDynamics.build_state(model, x0_pos, ini_rot , vel_ref[1], ini_w)
+        x0 = RobotDynamics.build_state(model, x0_pos, ini_rot, vel_ref[1], ini_w)
+        # x0 = RobotDynamics.build_state(model, x0_pos, UnitQuaternion(I) , vel_ref[1], zeros(3))
 
         # cost
         # costfun == :QuatLQR ? sq = 0 : sq = 1
@@ -189,7 +189,9 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
                 #if inside polytope all the way to end
                 
             end
-            poly_res_all = poly_res_start .& poly_res_end
+            # poly_res_all = poly_res_start .& poly_res_end
+            poly_res_all = ones(Bool, length(poly_res_start))
+            # @warn  "not deleting constraints"
             if debug_flag
                 println("polytope $polytope_counter")
                 println(poly_res_start, poly_res_end)

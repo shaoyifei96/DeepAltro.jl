@@ -3,3 +3,4 @@ statprof
 build
 .vscode
 /data
+*.csv

@@ -1,4 +1,5 @@
 # Set up problem using TrajectoryOptimization.jl and RobotZoo.jl
+import Pkg; Pkg.activate("/home/yifei/Documents/optimal_ctrl/Altro_og/Altro.jl"); Pkg.instantiate()
 using TrajectoryOptimization
 using Altro
 import RobotZoo.Cartpole
@@ -36,7 +37,6 @@ add_constraint!(conSet, goal, N)
 # Initialization
 u0 = @SVector fill(0.01,m)
 U0 = [u0 for k = 1:N-1]
-
 # Define problem
 prob = Problem(model, obj, x0, tf, xf=xf, constraints=conSet)
 initial_controls!(prob, U0)
@@ -45,13 +45,14 @@ initial_controls!(prob, U0)
 opts = SolverOptions(
     cost_tolerance_intermediate=1e-2,
     penalty_scaling=10.,
-    penalty_initial=1.0
+    penalty_initial=1.0,
+    projected_newton=false
 )
 altro = ALTROSolver(prob, opts)
 cvs_writer =  open("example.txt","a")
 for k = 1:10
     solve!(altro)
-    stats = solver.stats
+    stats = altro.stats
     
 end
 solve!(altro)
