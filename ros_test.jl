@@ -44,7 +44,7 @@ include("./yifei/quadrotor_kr.jl")
 
 obstacles = []# Ref{PolyhedronArray}() # Store it into a `Ref` which it's mutable but has a constant type
 # const traj_received = Ref{SplineTrajectory}()
-
+total_iter = 0
 macro debugtask(ex)
     quote
       try
@@ -64,6 +64,13 @@ macro debugtask(ex)
 function path_callback(msg::TrajectoryDiscretized, pub_obj::Publisher{Marker})
     #ToDo: compile to obj save startup time https://stackoverflow.com/questions/73599900/julia-seems-to-be-very-slow
     @debugtask begin
+        save_problem = false
+        if save_problem
+            global total_iter
+            input_file_name = "problem"*string(total_iter)*".jld2"
+            @save input_file_name msg obstacles total_iter
+            total_iter += 1
+        end
         println("path received")
         global obstacles
         if isempty(obstacles) # in master branch we have no obstacles as polytopes

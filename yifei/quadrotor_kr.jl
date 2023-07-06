@@ -31,7 +31,7 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         # Initial condition
         x0_pos = traj_ref[1] #this is planning in local coordinates
         # x0 = RobotDynamics.build_state(model, x0_pos, ini_rot, vel_ref[1], ini_w)
-        x0 = RobotDynamics.build_state(model, x0_pos,UnitQuaternion(I) , vel_ref[1], zeros(3))
+        x0 = RobotDynamics.build_state(model, x0_pos, ini_rot , vel_ref[1], ini_w)
 
         # cost
         # costfun == :QuatLQR ? sq = 0 : sq = 1
@@ -63,7 +63,7 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         Qw_diag = Dynamics.fill_state(model, 0.03, 0,0, 0.01) #no waypoint cost since only the final point matters
         # Qw_diag = Dynamics.fill_state(model, 10, 0.0,0,0) #to check correctness of things
                                         #    x   q:1*sq v:1 w:1
-        Qf_diag = Dynamics.fill_state(model, 1., 0.0, 1, 0.0)
+        Qf_diag = Dynamics.fill_state(model, 0.1, 0.0, 0.1, 0.0)
         xf = Dynamics.build_state(model, traj[end], UnitQuaternion(I), vel_ref[end], zeros(3))
 
         costs = map(1:length(traj)) do i
@@ -189,10 +189,12 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
                 #if inside polytope all the way to end
                 
             end
-            println("polytope $polytope_counter")
-            println(poly_res_start, poly_res_end)
             poly_res_all = poly_res_start .& poly_res_end
-            println(poly_res_all)
+            if debug_flag
+                println("polytope $polytope_counter")
+                println(poly_res_start, poly_res_end)
+                println(poly_res_all)
+            end
             if obs_start == 0
                 println("Warning: polytope $polytope_counter reverse = $(polytope_reverse_vec[polytope_counter]) not in trajectory")
                 if polytope_reverse_vec[polytope_counter]
@@ -210,8 +212,10 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
             add_constraint!(conSettemp, newcon,1)
             polytope_counter += 1
         end
-        display(start_end_mat)
-        println(polytope_reverse_vec)
+        if debug_flag
+            display(start_end_mat)
+            println(polytope_reverse_vec)
+        end
         for i = 1:length(conSettemp)
             if i == 1
                 start_idx = start_end_mat[i,1]
@@ -232,46 +236,16 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
                     last_idx = start_end_mat[i,2]
                 end
             end
-            add_constraint!(conSet, conSettemp[i], start_idx:last_idx)
-            println("adding constraint $i from $start_idx to $last_idx")
+            if last_idx >= start_idx #final check for empty constraints
+                add_constraint!(conSet, conSettemp[i], start_idx:last_idx)
+            end
+            if debug_flag
+                println("adding constraint $i from $start_idx to $last_idx")
+            end
         end
 
-
-        ## this function does not take into account of two sided walls
-        # polytope_counter = length(obstacles)
-        # traj_counter = length(traj)
-        # last_idx = length(traj)
-        # while traj_counter >= 0 && polytope_counter >= 1
-        #     poly = obstacles[polytope_counter]
-        #     if traj_counter == 0
-        #         poly_res = zeros(Bool, length(poly[2]))
-        #     else
-        #         poly_res = poly[1]*traj[traj_counter]-poly[2] .<= 0.0
-        #     end
-        #     if  all(poly_res)
-        #         traj_counter -= 1
-        #     else
-        #         if traj_counter >= last_idx
-        #             polytope_counter -= 1
-        #         else
-        #             newcon = LinearConstraint(n,m,-poly[1][.!poly_res,:], -poly[2][.!poly_res],Inequality(),1:3) 
-        #             add_constraint!(conSet, newcon, (traj_counter+1):last_idx)
-        #             println("""Adding constraint $(traj_counter+1) to $last_idx is in polytope $polytope_counter""")
-        #             polytope_counter -= 1
-        #             last_idx = traj_counter
-        #         end
-        #     end
-        # end
-        # if traj_counter < last_idx
-        #     newcon = LinearConstraint(n,m,-poly[1][.!poly_res,:], -poly[2][.!poly_res],Inequality(),1:3) 
-        #     add_constraint!(conSet, newcon, 1:last_idx)
-        #     println("""Adding constraint 1 to $last_idx is in polytope $polytope_counter""")
-        # end
-        
-# exit()
-        # Problem
         prob = Problem(model, obj, x0, tf, xf=xf, constraints=conSet)
-        initial_controls!(prob, U_hover)
+        initial_controls!(prob, U_ref)
         rollout!(prob)
 
         return prob, opts

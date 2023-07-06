@@ -48,6 +48,12 @@ opts = SolverOptions(
     penalty_initial=1.0
 )
 altro = ALTROSolver(prob, opts)
+cvs_writer =  open("example.txt","a")
+for k = 1:10
+    solve!(altro)
+    stats = solver.stats
+    
+end
 solve!(altro)
 
 # Get some info on the solve
@@ -68,3 +74,8 @@ stats.cost[end]              # terminal cost
 stats.c_max[end]             # terminal constraint satisfaction
 stats.gradient[end]          # terminal gradient of the Lagrangian
 dstats = Dict(stats)         # get the per-iteration stats as a dictionary (can be converted to DataFrame)
+
+println("Altro total ilqr iterations",stats.iterations)
+println("Altro total Augmented Lagrangian iterations",stats.iterations_outer[end])
+println("Altro solve status, ",Integer(status(altro)))
+

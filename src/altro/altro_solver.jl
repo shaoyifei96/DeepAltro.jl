@@ -28,11 +28,10 @@ as additional keyword arguments and will be set in the solver.
 * `Base.size`: returns `(n,m,N)`
 * `TO.is_constrained`
 """
-struct ALTROSolver{T,S,P} <: ConstrainedSolver{T}
+struct ALTROSolver{T,S} <: ConstrainedSolver{T}
     opts::SolverOptions{T}
     stats::SolverStats{T}
     solver_al::ALSolver{T,S}
-    solver_pn::P
 end
 
 function ALTROSolver(prob::Problem{T}, opts::SolverOptions=SolverOptions();
@@ -54,9 +53,9 @@ function ALTROSolver(prob::Problem{T}, opts::SolverOptions=SolverOptions();
     set_options!(opts; kwarg_opts...)
     stats = SolverStats{T}(parent=solvername(ALTROSolver))
     solver_al = ALSolver(prob, opts, stats, use_static=use_static)
-    solver_pn = ProjectedNewtonSolver(prob, opts, stats)
+    # solver_pn = ProjectedNewtonSolver(prob, opts, stats)
     S = typeof(solver_al.ilqr)
-    solver = ALTROSolver{T,S,typeof(solver_pn)}(opts, stats, solver_al, solver_pn)
+    solver = ALTROSolver{T,S}(opts, stats, solver_al)
     reset!(solver)
     # set_options!(solver; opts...)
     solver
@@ -80,7 +79,7 @@ solvername(::Type{<:ALTROSolver}) = :ALTRO
 
 # Methods
 function max_violation(solver::ALTROSolver)
-    return max(max_violation(solver.solver_al), max_violation(solver.solver_pn))
+    return max_violation(solver.solver_al)
 end
 
 function reset!(solver::ALTROSolver)
