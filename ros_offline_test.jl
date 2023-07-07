@@ -161,7 +161,7 @@ solver_iter_v = zeros(Int64, 0)
 solver_status_v = zeros(Int64, 0)
 # traj jerk cost = zeros(Float64, 0)
 
-for i = 30:129
+for i = 30:50
     @load "./data/problem$i.jld2" msg obstacles total_iter
     u_norm, solver_iter, status, traj_time, solve_time = problem_solving(msg, obstacles)
     push!(problem_id_v, i)

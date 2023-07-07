@@ -37,6 +37,8 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         # costfun == :QuatLQR ? sq = 0 : sq = 1
         # rm_quat = @SVector [1,2,3,4,5,6,8,9,10,11,12,13]                                    #       x         q:1e-5*sq      v 1e-3    w
         # Q = Diagonal(Q_diag)
+        q = @SVector [1,1,1,0,0,0,0,0,0,0,0,0,0]
+        r = @SVector fill(0.00,m)
         R = Diagonal(@SVector fill(0.1,m)) 
         q_nom = UnitQuaternion(I)
         ω_nom = zeros(3)
@@ -64,6 +66,7 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
         # Qw_diag = Dynamics.fill_state(model, 10, 0.0,0,0) #to check correctness of things
                                         #    x   q:1*sq v:1 w:1
         Qf_diag = Dynamics.fill_state(model, 0.1, 0.0, 0.1, 0.0)
+        
         xf = Dynamics.build_state(model, traj[end], UnitQuaternion(I), vel_ref[end], zeros(3))
 
         costs = map(1:length(traj)) do i
@@ -86,7 +89,13 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
             if costfun == :QuatLQR
                 TO.QuatLQRCost(Q, R, xg, u0)
             else
-                LQRCost(Q, R, xg, u0)
+                if times[i] == N
+                    # AbsCost(q, r, 0.0, xf = xg, uf = u0)
+                    LQRCost(Q, R, xg, u0)
+                else
+                    # AbsCost(q, r, 0.0, xf = xg, uf = u0)
+                    LQRCost(Q, R, xg, u0)
+                end
             end
             
             # end
@@ -239,6 +248,7 @@ function Quadrotor_kr(Rot=UnitQuaternion{Float64}; traj_ref, vel_ref, FM_ref, ob
                 end
             end
             if last_idx >= start_idx #final check for empty constraints
+                # @warn "not adding polytope cons!"
                 add_constraint!(conSet, conSettemp[i], start_idx:last_idx)
             end
             if debug_flag
