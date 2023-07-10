@@ -179,7 +179,7 @@ if online_mode
 end
 for i = 30:129
     println("problem $i ")
-    data_dict = load("/home/yifei/Documents/optimal_ctrl/Altro_og/Altro.jl/data/problem$i.jld2")# msg obstacles total_iter
+    data_dict = load("/home/yifei/Documents/optimal_ctrl/Altro_og/Altro.jl/data/problems_starting_from_yuwei/problem$i.jld2")# msg obstacles total_iter
     msg = data_dict["msg"]
     obstacles = data_dict["obstacles"]
     total_iter = data_dict["total_iter"]

@@ -210,36 +210,37 @@ function create_conset_and_remove_planes(obstacles, traj, n, m, N; remove_front_
         if polytope_reverse_vec[polytope_counter]
             poly= (-poly[1], -poly[2])
         end
-        if remove_front_rare_plane
-            for traj_counter = 1:length(traj)
-                poly_res = poly[1]*traj[traj_counter]-poly[2] .<= 0.0
-                if all(poly_res) && obs_start == 0
-                    obs_start = traj_counter
-                    if traj_counter > 1
-                        poly_res_start = poly[1]*traj[traj_counter-1]-poly[2] .<= 0.0
-                    end
-                    continue
-                    # this line shows when traj first enters the polytope 
-                    # what constraints are satisfied for the previous point
-                elseif all(poly_res) && obs_start != 0
-                    if traj_counter == length(traj)
-                        obs_end = length(traj)
-                        exit_flag = true
-                        if local_debug_flag
-                            println("exit flag set to true")
-                        end
-                    end
-                        #inside polytope
-                elseif !all(poly_res) && obs_start != 0
-                    poly_res_end = poly[1]*traj[traj_counter]-poly[2] .<= 0.0
-                    obs_end = traj_counter-1
-                    break
-                elseif !all(poly_res) && obs_start == 0
-                    continue #have not entered polytope yet
+        
+        for traj_counter = 1:length(traj)
+            poly_res = poly[1]*traj[traj_counter]-poly[2] .<= 0.0
+            if all(poly_res) && obs_start == 0
+                obs_start = traj_counter
+                if traj_counter > 1
+                    poly_res_start = poly[1]*traj[traj_counter-1]-poly[2] .<= 0.0
                 end
-                #if inside polytope all the way to end
-                
+                continue
+                # this line shows when traj first enters the polytope 
+                # what constraints are satisfied for the previous point
+            elseif all(poly_res) && obs_start != 0
+                if traj_counter == length(traj)
+                    obs_end = length(traj)
+                    exit_flag = true
+                    if local_debug_flag
+                        println("exit flag set to true")
+                    end
+                end
+                    #inside polytope
+            elseif !all(poly_res) && obs_start != 0
+                poly_res_end = poly[1]*traj[traj_counter]-poly[2] .<= 0.0
+                obs_end = traj_counter-1
+                break
+            elseif !all(poly_res) && obs_start == 0
+                continue #have not entered polytope yet
             end
+            #if inside polytope all the way to end
+            
+        end
+        if remove_front_rare_plane
             poly_res_all = poly_res_start .& poly_res_end
         else
             poly_res_all = ones(Bool, length(poly_res_start))
@@ -254,8 +255,7 @@ function create_conset_and_remove_planes(obstacles, traj, n, m, N; remove_front_
         if obs_start == 0
             println("Polytope $polytope_counter reverse = $(polytope_reverse_vec[polytope_counter]) not in trajectory")
             if polytope_reverse_vec[polytope_counter]
-                @warn "traj not in polytope"#TODO: bug here, the above warning seems to appear only once before the error appear
-                # warning should appear twice once for reverse true and once for reverse false
+                @warn "traj not in polytope"
                 polytope_counter += 1
                 if polytope_counter > length(obstacles)
                     break

@@ -220,6 +220,7 @@ end
 
 function obs_callback(msg::PolyhedronArray)
     @debugtask begin
+        println("obstacles updated")
         polys = []
 
         for polyhedron in msg.polyhedrons
