@@ -15,6 +15,7 @@ using Statistics
 using TimerOutputs
 using ForwardDiff
 using FiniteDiff
+using Debugger
 import Octavian
 
 const TO = TrajectoryOptimization

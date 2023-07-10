@@ -1,5 +1,8 @@
 #!!!need to run ros_offline_prep first if first time running!!!
-using Revise
+if ! isinteractive()
+    include("./ros_offline_prep.jl")
+end
+
 using .kr_planning_msgs.msg: TrajectoryDiscretized, SplineTrajectory
 using .visualization_msgs.msg
 using .decomp_ros_msgs.msg
@@ -35,10 +38,11 @@ using Plots
 using Profile
 using CSV
 using DataFrames
+online_mode = false
 
 include("./yifei/quadrotor_kr.jl")
 
-
+wait_for_key(prompt) = (print(stdout, prompt); read(stdin, 1); nothing)
 function problem_solving(msg, obstacles)
     println("path received")
     if isempty(obstacles) # in master branch we have no obstacles as polytopes
@@ -89,7 +93,8 @@ function problem_solving(msg, obstacles)
         d = ilqr.d  # feedforward gains. Should be small.
 
         stats = Altro.stats(solver) 
-        
+        # println(fieldnames(typeof()))    
+        # println()
         x_plot = [v[1] for v in X]
         y_plot = [v[2] for v in X]
         z_plot = [v[3] for v in X]
@@ -143,36 +148,69 @@ function problem_solving(msg, obstacles)
             plot!(msg.t,u3_ref,label="u3 ref",lc=:blue,ls=:dash)
             plot!(msg.t,u4_ref,label="u4 ref",lc=:black,ls=:dash)
 
+
+            p4 = plot(x_plot, y_plot, z_plot, label="refined path",lc=:green,ls=:solid, aspect_ratio = :equal)
+            plot!(x_ref_plot, y_ref_plot, z_ref_plot, label="original path",lc=:black,ls=:dash)
+            
             savefig(p, "refined_path.png")
             savefig(p2, "refined_vel.png")
             savefig(p3, "control_inputs.png")
+            savefig(p4, "refined_path_3d.png")
 
         end
     end
+    dt = msg.t[end] / 99.0
     # return controls, total ilqr iterations,   TODO: total time may be not correct when doing time optimization
-    return norm(u1)+norm(u2)+norm(u3)+norm(u4) , stats.iterations, Integer(stats.status), T[end], stats.tsolve
+    return X, stats.cost[end], (norm(diff(u1))+norm(diff(u2))+norm(diff(u3))+norm(diff(u4)))/dt, norm(u1)+norm(u2)+norm(u3)+norm(u4) , stats.iterations, Integer(stats.status), T[end], stats.tsolve
 end
 
 problem_id_v = zeros(Int64, 0) 
 solve_time_v = zeros(Float64, 0)
+u_smooth_v = zeros(Float64, 0)
 u_norm_v = zeros(Float64, 0)
 traj_time_v = zeros(Float64, 0)
 solver_iter_v = zeros(Int64, 0)
 solver_status_v = zeros(Int64, 0)
+traj_cost_v = zeros(Float64, 0)
 # traj jerk cost = zeros(Float64, 0)
-
-for i = 30:50
-    @load "./data/problem$i.jld2" msg obstacles total_iter
-    u_norm, solver_iter, status, traj_time, solve_time = problem_solving(msg, obstacles)
+if online_mode
+    pub = Publisher{Marker}("iLQR_path", queue_size=1)
+    init_node("path_refiner")
+end
+for i = 30:129
+    println("problem $i ")
+    data_dict = load("/home/yifei/Documents/optimal_ctrl/Altro_og/Altro.jl/data/problem$i.jld2")# msg obstacles total_iter
+    msg = data_dict["msg"]
+    obstacles = data_dict["obstacles"]
+    total_iter = data_dict["total_iter"]
+    
+    X, traj_cost, u_smooth, u_norm, solver_iter, status, traj_time, solve_time = problem_solving(msg, obstacles)
+    push!(u_smooth_v, u_smooth)
     push!(problem_id_v, i)
     push!(solve_time_v, solve_time)
     push!(u_norm_v, u_norm)
     push!(traj_time_v, traj_time)
     push!(solver_iter_v, solver_iter)
     push!(solver_status_v, status)
-    # msg = obj.msg 
-    # obstacles = obj.obstacles
-    #also avaiable: total_iter
+    push!(traj_cost_v,traj_cost)
+    send_msg = Marker()
+    send_msg.type = 4
+    send_msg.header = msg.header
+    send_msg.scale.x = 0.2
+    
+    send_msg.points = Point[]
+    for x in X
+        push!(send_msg.points, Point(x[1], x[2], x[3]))
+    end
+    send_msg.color = ColorRGBA(1.0, 0.0, 0.0, 1.0)
+    if online_mode
+        publish(pub, send_msg) 
+        # msg = obj.msg 
+        # obstacles = obj.obstacles
+        #also avaiable: total_iter
+        spin()
+        wait_for_key("press any key to continue")
+    end
     
 end
 df = DataFrame(
@@ -181,7 +219,9 @@ solve_time = solve_time_v,
 u_norm_over_hover = u_norm_v,
 traj_time = traj_time_v,
 solver_iter = solver_iter_v,
-solver_status = solver_status_v
+solver_status = solver_status_v,
+u_smooth = u_smooth_v,
+traj_cost = traj_cost_v
                )
 CSV.write("ros_offline_stats.csv", df)
 

@@ -216,6 +216,26 @@ end
 Evaluate the constraint at all time steps, storing the result in the [`ALConstraint`](@ref).
 """
 function TO.evaluate_constraints!(alcon::ALConstraint)
+    # println(size( alcon.vals),size(alcon.Z[1]),alcon.inds)
+    # println(alcon.sig)
+    # println(size(alcon.inds))
+    # println(size(alcon.vals))
+    # println(size(alcon.Z[1]))
+    # # println(alcon.con)
+    # println(typeof(alcon.con))
+    # println(alcon.con.n)
+    # println(alcon.con.m)
+    # # println(size(alcon.con.A))
+    # # println(size(alcon.con.b))
+    # println("con idx:", alcon.con.inds)
+    # # n::Int
+	# # m::Int
+	# # A::SizedMatrix{P,W,T,2,Matrix{T}}
+	# # b::SVector{P,T}
+	# # sense::S
+	# # inds::SVector{W,Int}
+    # println("========================")
+
     TO.evaluate_constraints!(alcon.sig, alcon.con, alcon.vals, alcon.Z[1], alcon.inds)
 end
 
