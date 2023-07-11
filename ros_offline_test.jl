@@ -43,7 +43,7 @@ online_mode = false
 include("./yifei/quadrotor_kr.jl")
 
 wait_for_key(prompt) = (print(stdout, prompt); read(stdin, 1); nothing)
-function problem_solving(msg, obstacles)
+function problem_solving(msg, obstacles, total_iter)
     println("path received")
     if isempty(obstacles) # in master branch we have no obstacles as polytopes
         println("no obstacles")
@@ -120,7 +120,7 @@ function problem_solving(msg, obstacles)
         u2_ref = [u[2].-u0 for u in U_hover]
         u3_ref = [u[3].-u0 for u in U_hover]
         u4_ref = [u[4].-u0 for u in U_hover]
-        plotting_bool = true
+        plotting_bool = false
         if plotting_bool
             p = plot(T,x_plot, label="refined path x", lc=:red,ls=:solid)
             # p2 = plot(U[:,1], label="refined ctrl")
@@ -150,18 +150,18 @@ function problem_solving(msg, obstacles)
 
 
             p4 = plot(x_plot, y_plot, z_plot, label="refined path",lc=:green,ls=:solid, aspect_ratio = :equal)
-            plot!(x_ref_plot, y_ref_plot, z_ref_plot, label="original path",lc=:black,ls=:dash)
+            plot!(x_ref_plot, y_ref_plot, z_ref_plot, label="original path",lc=:black,ls=:dash, aspect_ratio = :equal)
             
-            savefig(p, "refined_path.png")
-            savefig(p2, "refined_vel.png")
-            savefig(p3, "control_inputs.png")
-            savefig(p4, "refined_path_3d.png")
+            savefig(p, "./plots/$(total_iter)refined_path.png")
+            savefig(p2, "./plots/$(total_iter)refined_vel.png")
+            savefig(p3, "./plots/$(total_iter)control_inputs.png")
+            savefig(p4, "./plots/$(total_iter)refined_path_3d.png")
 
         end
     end
     dt = msg.t[end] / 99.0
     # return controls, total ilqr iterations,   TODO: total time may be not correct when doing time optimization
-    return X, stats.cost[end], (norm(diff(u1))+norm(diff(u2))+norm(diff(u3))+norm(diff(u4)))/dt, norm(u1)+norm(u2)+norm(u3)+norm(u4) , stats.iterations, Integer(stats.status), T[end], stats.tsolve
+    return X, T, stats.cost[end], (norm(diff(u1))+norm(diff(u2))+norm(diff(u3))+norm(diff(u4)))/dt, norm(u1)+norm(u2)+norm(u3)+norm(u4) , stats.iterations, Integer(stats.status), T[end], stats.tsolve
 end
 
 problem_id_v = zeros(Int64, 0) 
@@ -184,7 +184,7 @@ for i = 30:129
     obstacles = data_dict["obstacles"]
     total_iter = data_dict["total_iter"]
     
-    X, traj_cost, u_smooth, u_norm, solver_iter, status, traj_time, solve_time = problem_solving(msg, obstacles)
+    X, T, traj_cost, u_smooth, u_norm, solver_iter, status, traj_time, solve_time = problem_solving(msg, obstacles, total_iter)
     push!(u_smooth_v, u_smooth)
     push!(problem_id_v, i)
     push!(solve_time_v, solve_time)
@@ -193,24 +193,51 @@ for i = 30:129
     push!(solver_iter_v, solver_iter)
     push!(solver_status_v, status)
     push!(traj_cost_v,traj_cost)
-    send_msg = Marker()
-    send_msg.type = 4
-    send_msg.header = msg.header
-    send_msg.scale.x = 0.2
+    save_traj_data = true
+    if save_traj_data
+        x_pos = zeros(Float64, 0)
+        y_pos = zeros(Float64, 0)
+        z_pos = zeros(Float64, 0)
+        x_vel = zeros(Float64, 0)
+        y_vel = zeros(Float64, 0)
+        z_vel = zeros(Float64, 0)
+        for x in X # p[1,2,3], q[4,5,6,7], v[8,9,10], w[11,12,13]
+            push!(x_pos, x[1])
+            push!(y_pos, x[2])
+            push!(z_pos, x[3])
+            push!(x_vel, x[8])
+            push!(y_vel, x[9])
+            push!(z_vel, x[10])
+        end
+        traj_data = DataFrame(
+        x_pos = x_pos,
+        y_pos = y_pos,
+        z_pos = z_pos,
+        x_vel = x_vel,
+        y_vel = y_vel,
+        z_vel = z_vel,
+        t = T
+        )
+        CSV.write("./plots/$(i)traj_data.csv", traj_data)
+    end
+        #     push!(send_msg.points, Point(x[1], x[2], x[3]))
+        # end
+    # send_msg = Marker()
+    # send_msg.type = 4
+    # send_msg.header = msg.header
+    # send_msg.scale.x = 0.2
     
-    send_msg.points = Point[]
-    for x in X
-        push!(send_msg.points, Point(x[1], x[2], x[3]))
-    end
-    send_msg.color = ColorRGBA(1.0, 0.0, 0.0, 1.0)
-    if online_mode
-        publish(pub, send_msg) 
-        # msg = obj.msg 
-        # obstacles = obj.obstacles
-        #also avaiable: total_iter
-        spin()
-        wait_for_key("press any key to continue")
-    end
+    # send_msg.points = Point[]
+    # 
+    # send_msg.color = ColorRGBA(1.0, 0.0, 0.0, 1.0)
+    # if online_mode
+    #     publish(pub, send_msg) #not working, maybe problem of ROS Julia
+    #     # msg = obj.msg 
+    #     # obstacles = obj.obstacles
+    #     #also avaiable: total_iter
+    #     spin()
+    #     wait_for_key("press any key to continue")
+    # end
     
 end
 df = DataFrame(

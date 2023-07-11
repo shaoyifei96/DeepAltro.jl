@@ -123,7 +123,6 @@ function lin_cons_update!(conset::ALConstraintSet)
             # display(alcon.λ) #[collocation pts, plane]
             # display(alcon.λ)
             λmax = map(maximum, alcon.λ)#[collocation pts, 1]
-            marked_delete = Int8[]
             if debug_flag
                 printstyled("Found Linear Cons \n"; color = :red)
                 og_polytope_idx = findfirst(x -> x == alcon.con.A, lincons_A)

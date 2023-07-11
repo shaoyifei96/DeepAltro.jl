@@ -9,8 +9,7 @@ directory = os.fsencode('./')
     
 for file in os.listdir(directory):
     filename = os.fsdecode(file)
-    print(filename)
-    if filename.endswith(".csv") and filename.startswith("new_test_cons"):
+    if filename.endswith(".csv") and filename.startswith("new_weights_test"):
         print(filename)
         csv = pandas.read_csv(filename)
         print("iterations = ",csv.loc[:, 'solver_iter'].mean())
