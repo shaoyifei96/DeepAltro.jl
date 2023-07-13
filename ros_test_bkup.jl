@@ -65,7 +65,7 @@ macro debugtask(ex)
 function path_callback(msg::TrajectoryDiscretized, pub_obj::Publisher{Marker})
     #ToDo: compile to obj save startup time https://stackoverflow.com/questions/73599900/julia-seems-to-be-very-slow
     @debugtask begin
-        save_problem = false
+        save_problem = true
         if save_problem
             global total_iter
             input_file_name = "problem"*string(total_iter)*".jld2"
@@ -170,17 +170,17 @@ function path_callback(msg::TrajectoryDiscretized, pub_obj::Publisher{Marker})
                 plot!(T[1:end-1],u2, label="u2",lc=:green,ls=:solid)
                 plot!(T[1:end-1],u3, label="u3",lc=:blue,ls=:solid)
                 plot!(T[1:end-1],u4, label="u4",lc=:black,ls=:solid)
-                plot!(msg.t,u1_ref,label="u1 ref",lc=:red,ls=:dash)
-                plot!(msg.t,u2_ref,label="u2 ref",lc=:green,ls=:dash)
-                plot!(msg.t,u3_ref,label="u3 ref",lc=:blue,ls=:dash)
-                plot!(msg.t,u4_ref,label="u4 ref",lc=:black,ls=:dash)
+                # plot!(msg.t,u1_ref,label="u1 ref",lc=:red,ls=:dash)
+                # plot!(msg.t,u2_ref,label="u2 ref",lc=:green,ls=:dash)
+                # plot!(msg.t,u3_ref,label="u3 ref",lc=:blue,ls=:dash)
+                # plot!(msg.t,u4_ref,label="u4 ref",lc=:black,ls=:dash)
                 
                 dt = msg.t[end] / 99.0
                 println("U_diff_norm", (norm(diff(u1))+norm(diff(u2))+norm(diff(u3))+norm(diff(u4)))/dt)
                 println("U norm",norm(u1)+norm(u2)+norm(u3)+norm(u4))
-                savefig(p, "refined_path.png")
-                savefig(p2, "refined_vel.png")
-                savefig(p3, "control_inputs.png")
+                savefig(p, "refined_path_bkup.png")
+                savefig(p2, "refined_vel_bkup.png")
+                savefig(p3, "control_inputs_bkup.png")
                 traj_data = DataFrame(
                     u1 = u1,
                     u2 = u2,
@@ -194,7 +194,7 @@ function path_callback(msg::TrajectoryDiscretized, pub_obj::Publisher{Marker})
                     vz_plot = vz_plot[1:end-1],
                     t = T[1:end-1]
                     )
-                CSV.write("./traj_data.csv", traj_data)
+                CSV.write("./traj_data_bkup.csv", traj_data)
             end
             stats = Altro.stats(solver) 
             println("Traj Cost = ", stats.cost[end])
@@ -207,7 +207,7 @@ function path_callback(msg::TrajectoryDiscretized, pub_obj::Publisher{Marker})
             for x in X
                 push!(send_msg.points, Point(x[1], x[2], x[3]))
             end
-            send_msg.color = ColorRGBA(1.0, 0.0, 0.0, 1.0)
+            send_msg.color = ColorRGBA(0.0, 1.0, 0.0, 1.0)
             publish(pub_obj, send_msg)
         end
     end
@@ -301,8 +301,8 @@ end
 # end
 
 function main()
-    init_node("path_refiner")
-    pub = Publisher{Marker}("iLQR_path", queue_size=1)
+    init_node("path_refiner_bkup")
+    pub = Publisher{Marker}("iLQR_path_bkup", queue_size=1)
     # sub = Subscriber{Pose2D}("pose", callback, (pub,), queue_size=10)
     
     sub1 = Subscriber{TrajectoryDiscretized}("/spline_traj_samples", path_callback, (pub,), queue_size=1)

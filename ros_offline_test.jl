@@ -39,6 +39,9 @@ using Profile
 using CSV
 using DataFrames
 online_mode = false
+plotting_save_bool = false
+save_traj_data = false
+
 
 include("./yifei/quadrotor_kr.jl")
 
@@ -120,8 +123,7 @@ function problem_solving(msg, obstacles, total_iter)
         u2_ref = [u[2].-u0 for u in U_hover]
         u3_ref = [u[3].-u0 for u in U_hover]
         u4_ref = [u[4].-u0 for u in U_hover]
-        plotting_bool = false
-        if plotting_bool
+        if plotting_save_bool
             p = plot(T,x_plot, label="refined path x", lc=:red,ls=:solid)
             # p2 = plot(U[:,1], label="refined ctrl")
             plot!(T,y_plot, label="refined path y",lc=:green,ls=:solid)
@@ -161,7 +163,7 @@ function problem_solving(msg, obstacles, total_iter)
     end
     dt = msg.t[end] / 99.0
     # return controls, total ilqr iterations,   TODO: total time may be not correct when doing time optimization
-    return X, T, stats.cost[end], (norm(diff(u1))+norm(diff(u2))+norm(diff(u3))+norm(diff(u4)))/dt, norm(u1)+norm(u2)+norm(u3)+norm(u4) , stats.iterations, Integer(stats.status), T[end], stats.tsolve
+    return X, U, T, stats.cost[end], (norm(diff(u1))+norm(diff(u2))+norm(diff(u3))+norm(diff(u4)))/dt, norm(u1)+norm(u2)+norm(u3)+norm(u4) , stats.iterations, Integer(stats.status), T[end], stats.tsolve
 end
 
 problem_id_v = zeros(Int64, 0) 
@@ -184,7 +186,7 @@ for i = 30:129
     obstacles = data_dict["obstacles"]
     total_iter = data_dict["total_iter"]
     
-    X, T, traj_cost, u_smooth, u_norm, solver_iter, status, traj_time, solve_time = problem_solving(msg, obstacles, total_iter)
+    X, U, T, traj_cost, u_smooth, u_norm, solver_iter, status, traj_time, solve_time = problem_solving(msg, obstacles, total_iter)
     push!(u_smooth_v, u_smooth)
     push!(problem_id_v, i)
     push!(solve_time_v, solve_time)
@@ -193,7 +195,6 @@ for i = 30:129
     push!(solver_iter_v, solver_iter)
     push!(solver_status_v, status)
     push!(traj_cost_v,traj_cost)
-    save_traj_data = true
     if save_traj_data
         x_pos = zeros(Float64, 0)
         y_pos = zeros(Float64, 0)
